@@ -48,10 +48,10 @@ def test_backfill_creates_declared_mappings_and_is_idempotent(tmp_path):
         db.commit()
         mappings = db.query(RuleTechniqueMap).all()
         assert {(m.technique_id, m.source, m.confirmed) for m in mappings} == {
-            ("T1059.001", "declared_tag", False),
+            ("T1059.001", "declared_tag", True),
             ("T1059.001", "brute_force_confirmed", True),
-            ("T1003.001", "declared_tag", False),
-            ("T1057", "declared_tag", False),
+            ("T1003.001", "declared_tag", True),
+            ("T1057", "declared_tag", True),
         }
 
         assert backfill_declared_technique_mappings(db) == 0

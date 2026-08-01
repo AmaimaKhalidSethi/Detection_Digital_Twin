@@ -1,0 +1,1206 @@
+{
+  "imported": 0,
+  "skipped": 300,
+  "skipped_reasons": [
+    {
+      "path": "linux/network_connection/net_connection_lnx_back_connect_shell_dev.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/network_connection/net_connection_lnx_crypto_mining_indicators.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/network_connection/net_connection_lnx_domain_localtonet_tunnel.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/network_connection/net_connection_lnx_ngrok_tunnel.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/network_connection/net_connection_lnx_susp_malware_callback_port.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_apt_shell_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_at_command.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_auditctl_clear_rules.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_av_kaspersky_av_disabled.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_awk_shell_spawn.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_base64_decode.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_base64_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_base64_shebang_cli.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_bash_interactive_shell.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_bpf_kprob_tracing_enabled.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_bpftrace_unsafe_option_usage.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_cap_setgid.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_cap_setuid.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_capa_discovery.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_capsh_shell_invocation.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_chattr_immutable_removal.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_chmod_targeting_sensitive_directories.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_chroot_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_clear_logs.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_clear_syslog.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_clipboard_collection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_cp_passwd_or_shadow_tmp.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_crontab_enumeration.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_crontab_removal.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_crypto_mining.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_curl_usage.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_curl_wget_exec_tmp.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_dd_file_overwrite.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_dd_process_injection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_disable_ufw.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_doas_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_env_shell_invocation.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_esxcli_network_discovery.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_esxcli_permission_change_admin.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_esxcli_storage_discovery.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_esxcli_syslog_config_change.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_esxcli_system_discovery.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_esxcli_user_account_creation.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_esxcli_vm_discovery.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_esxcli_vm_kill.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_esxcli_vsan_discovery.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_file_and_directory_discovery.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_file_deletion.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_find_shell_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_flock_shell_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_gcc_shell_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_git_shell_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_grep_os_arch_discovery.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_groupdel.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_install_root_certificate.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_install_suspicious_packages.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_iptables_flush_ufw.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_local_account.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_local_groups.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_malware_gobrat_grep_payload_discovery.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_mkfifo_named_pipe_creation.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_mkfifo_named_pipe_creation_susp_location.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_mount_hidepid.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_netcat_reverse_shell.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_nice_shell_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_nohup.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_nohup_susp_execution.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_omigod_scx_runasprovider_executescript.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_omigod_scx_runasprovider_executeshellcommand.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_perl_reverse_shell.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_php_reverse_shell.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_pnscan_binary_cli_pattern.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_proxy_connection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_pua_trufflehog.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_python_base64_encoded_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_python_http_server_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_python_pty_spawn.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_python_reverse_shell.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_python_shell_os_system.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_remote_access_tools_teamviewer_incoming_connection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_remote_system_discovery.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_remove_package.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_rsync_shell_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_rsync_shell_spawn.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "linux/process_creation/proc_creation_lnx_ruby_reverse_shell.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_addinutil_initiated.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_adws_unusual_connection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_certutil_initiated_connection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_cmstp_initiated_connection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_dialer_initiated_connection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_azurewebsites.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_btunnels.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_cloudflared_communication.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_crypto_mining_pools.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_dead_drop_resolvers.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_devtunnels.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_dropbox_api.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_external_ip_lookup.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_google_api_non_browser_access.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_localtonet_tunnel.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_mega_nz.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_ngrok.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_ngrok_tunnel.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_notion_api_susp_communication.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_portmap.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_telegram_api_non_browser_access.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_domain_vscode_tunnel_connection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_eqnedt.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_finger.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_imewdbld.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_notepad.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_office_outbound_non_local_ip.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_office_uncommon_ports.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_python.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_rdp_outbound_over_non_standard_tools.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_rdp_reverse_tunnel.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_rdp_to_http.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_regasm_network_activity.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_regsvr32_network_activity.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_remote_access_tools_anydesk_incoming_connection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_rundll32_net_connections.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_silenttrinity_stager_msbuild_activity.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_susp_binary_no_cmdline.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_susp_file_sharing_domains_susp_folders.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_susp_initiated_uncommon_or_suspicious_locations.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_susp_malware_callback_port.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_susp_malware_callback_ports_uncommon.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_susp_outbound_kerberos_connection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_susp_outbound_mobsync_connection.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/network_connection/net_connection_win_susp_outbound_smtp_connections.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_7zip_exfil_dmp_files.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_7zip_password_compression.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_acccheckconsole_execution.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_addinutil_suspicious_cmdline.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_addinutil_uncommon_child_process.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_addinutil_uncommon_cmdline.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_addinutil_uncommon_dir_exec.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_adplus_memory_dump.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_agentexecutor_potential_abuse.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_agentexecutor_susp_usage.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_amsi_registry_tampering.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_appvlp_uncommon_child_process.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_arcsoc_susp_child_process.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_aspnet_compiler_exectuion.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_aspnet_compiler_susp_child_process.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_aspnet_compiler_susp_paths.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_at_interactive_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_atbroker_uncommon_ats_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_attrib_hiding_files.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_attrib_system_susp_paths.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_auditpol_nt_resource_kit_usage.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_auditpol_susp_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_autologger_session_registry_modification.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_autorun_registry_modified_via_wmic.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_baaupdate_susp_child_process.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bash_command_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bash_file_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bcdedit_boot_conf_tamper.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bcdedit_susp_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bcp_export_data.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bginfo_suspicious_child_process.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bginfo_uncommon_child_process.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bitlockertogo_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bitsadmin_download.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bitsadmin_download_direct_ip.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bitsadmin_download_file_sharing_domains.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bitsadmin_download_susp_extensions.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bitsadmin_download_susp_targetfolder.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_bitsadmin_potential_persistence.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_browsers_chromium_headless_debugging.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_browsers_chromium_headless_exec.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_browsers_chromium_headless_file_download.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_browsers_chromium_load_extension.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_browsers_chromium_mockbin_abuse.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_browsers_chromium_susp_load_extension.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_browsers_inline_file_download.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_browsers_remote_debugging.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_browsers_tor_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_calc_uncommon_exec.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cdb_arbitrary_command_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certmgr_certificate_installation.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certoc_download.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certoc_download_direct_ip.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certoc_load_dll.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certoc_load_dll_susp_locations.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certreq_download.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certutil_certificate_installation.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certutil_decode.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certutil_download.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certutil_download_direct_ip.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certutil_download_file_sharing_domains.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certutil_encode.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certutil_encode_susp_extensions.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certutil_encode_susp_location.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certutil_export_pfx.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_certutil_ntlm_coercion.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_chcp_codepage_lookup.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_chcp_codepage_switch.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cipher_overwrite_deleted_data.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_citrix_trolleyexpress_procdump.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_clip_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cloudflared_portable_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cloudflared_quicktunnel_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cloudflared_tunnel_cleanup.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cloudflared_tunnel_run.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_assoc_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_assoc_tamper_exe_file_association.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_copy_dmp_from_share.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_curl_download_exec_combo.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_del_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_del_greedy_deletion.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_dir_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_dosfuscation.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_http_appdata.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_launched_with_hidden_start_flag.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_mklink_osk_cmd.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_mklink_shadow_copies_access_symlink.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_net_use_and_exec_combo.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_no_space_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_ntdllpipe_redirect.yml",
+      "reason": "no MITRE ATT&CK technique tags"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_path_traversal.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_ping_copy_combined_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_ping_del_combined_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_redirection_susp_folder.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_rmdir_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_shadowcopy_access.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_stdin_redirect.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_sticky_key_like_backdoor_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_sticky_keys_replace.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_type_arbitrary_file_download.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmd_unusual_parent.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmdkey_adding_generic_creds.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmdkey_recon.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmdl32_arbitrary_file_download.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_cmstp_execution_by_creation.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_comodo_ssh_shellhost_cmd_spawn.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_configsecuritypolicy_download_file.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_conhost_headless_powershell.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_conhost_legacy_option.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_conhost_path_traversal.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_conhost_susp_child_process.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_conhost_susp_winshell_child_process.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_conhost_uncommon_parent.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_control_panel_item.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_create_new_dmsasvc_account.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_createdump_lolbin_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_credential_guard_registry_tampering.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_csc_susp_dynamic_compilation.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_csc_susp_parent.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/process_creation/proc_creation_win_csi_execution.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_add/registry_add_persistence_disk_cleanup_handler_entry.yml",
+      "reason": "Unsupported logsource.category 'registry_add' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_delete/registry_delete_defender_context_menu.yml",
+      "reason": "Unsupported logsource.category 'registry_delete' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_delete/registry_delete_disable_credential_guard.yml",
+      "reason": "Unsupported logsource.category 'registry_delete' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_delete/registry_delete_enable_windows_recall.yml",
+      "reason": "Unsupported logsource.category 'registry_delete' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_delete/registry_delete_exploit_guard_protected_folders.yml",
+      "reason": "Unsupported logsource.category 'registry_delete' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_delete/registry_delete_mstsc_history_cleared.yml",
+      "reason": "Unsupported logsource.category 'registry_delete' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_delete/registry_delete_removal_amsi_registry_key.yml",
+      "reason": "Unsupported logsource.category 'registry_delete' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_delete/registry_delete_removal_com_hijacking_registry_key.yml",
+      "reason": "Unsupported logsource.category 'registry_delete' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_delete/registry_delete_runmru.yml",
+      "reason": "Unsupported logsource.category 'registry_delete' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_delete/registry_delete_schtasks_hide_task_via_index_value_removal.yml",
+      "reason": "Unsupported logsource.category 'registry_delete' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_delete/registry_delete_schtasks_hide_task_via_sd_value_removal.yml",
+      "reason": "Unsupported logsource.category 'registry_delete' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_add_local_hidden_user.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_bypass_via_wsreset.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_cmstp_execution_by_registry.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_defender_threat_action_modified.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_disable_security_events_logging_adding_reg_key_minint.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_disable_wdigest_credential_guard.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_esentutl_volume_shadow_copy_service_keys.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_hack_wce_reg.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_hybridconnectionmgr_svc_installation.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_mal_azorult.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_malware_qakbot_registry.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_modify_screensaver_binary_path.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_narrator_feedback_persistance.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_net_ntlm_downgrade.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_new_dll_added_to_appcertdlls_registry_key.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_new_dll_added_to_appinit_dlls_registry_key.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_office_test_regadd.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_office_trust_record_modification.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_persistence_recycle_bin.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_portproxy_registry_key.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_redmimicry_winnti_reg.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_runkey_winekey.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_runonce_persistence.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_shell_open_keys_manipulation.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_silentprocessexit_lsass.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_ssp_added_lsa_config.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_stickykey_like_backdoor.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_susp_atbroker_change.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_susp_download_run_key.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_susp_lsass_dll_load.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_susp_mic_cam_access.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_event_susp_process_registry_modification.yml",
+      "reason": "already imported"
+    },
+    {
+      "path": "windows/registry/registry_event/registry_set_enable_anonymous_connection.yml",
+      "reason": "Unsupported logsource.category 'registry_set' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_set/registry_set_add_load_service_in_safe_mode.yml",
+      "reason": "Unsupported logsource.category 'registry_set' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_set/registry_set_add_port_monitor.yml",
+      "reason": "Unsupported logsource.category 'registry_set' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_set/registry_set_aedebug_persistence.yml",
+      "reason": "Unsupported logsource.category 'registry_set' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_set/registry_set_allow_rdp_remote_assistance_feature.yml",
+      "reason": "Unsupported logsource.category 'registry_set' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_set/registry_set_amsi_com_hijack.yml",
+      "reason": "Unsupported logsource.category 'registry_set' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    },
+    {
+      "path": "windows/registry/registry_set/registry_set_amsi_disable.yml",
+      "reason": "Unsupported logsource.category 'registry_set' (supported: ['network_connection', 'process_creation', 'registry_event'])"
+    }
+  ]
+}

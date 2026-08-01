@@ -91,6 +91,8 @@ def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
         version_number=1,
         yaml_content=payload.yaml_content,
         mitre_techniques=result.mitre_techniques or [],
+        author=getattr(result.rule, "author", None),
+        license=getattr(result.rule, "license", None),
     )
     db.add(version)
     db.flush()
@@ -100,7 +102,7 @@ def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
                 rule_version_id=version.id,
                 technique_id=technique_id,
                 source="declared_tag",
-                confirmed=False,
+                confirmed=True,
             )
         )
     db.commit()
@@ -126,6 +128,8 @@ def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(
         version_number=next_version_number,
         yaml_content=payload.yaml_content,
         mitre_techniques=result.mitre_techniques or [],
+        author=getattr(result.rule, "author", None),
+        license=getattr(result.rule, "license", None),
     )
     db.add(version)
     db.flush()
@@ -135,7 +139,7 @@ def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(
                 rule_version_id=version.id,
                 technique_id=technique_id,
                 source="declared_tag",
-                confirmed=False,
+                confirmed=True,
             )
         )
     db.commit()
@@ -287,6 +291,7 @@ def list_alerts(db: Session = Depends(get_db)):
             {
                 "alert_id": r.id,
                 "rule_title": rv.rule.title if rv else "(deleted rule)",
+                "rule_author": rv.author if rv else None,
                 "rule_version_id": r.rule_version_id,
                 "technique_id": run.technique_id if run else None,
                 "evaluated_at": r.evaluated_at.isoformat(),

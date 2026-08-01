@@ -23,21 +23,24 @@ from app.models.db import (
 def backfill_declared_technique_mappings(db: Session) -> int:
     """Create missing ``declared_tag`` mappings from the legacy JSON field.
 
-    The operation is idempotent and does not modify existing evidence rows.
+    The operation is idempotent; existing declared mappings are also upgraded
+    to confirmed because the rule author supplied their ATT&CK tag.
     """
     added = 0
     for version in db.query(RuleVersion).yield_per(100):
         technique_ids = version.mitre_techniques or []
         for technique_id in set(technique_ids):
             key = (version.id, technique_id, "declared_tag")
-            if db.get(RuleTechniqueMap, key) is not None:
+            existing = db.get(RuleTechniqueMap, key)
+            if existing is not None:
+                existing.confirmed = True
                 continue
             db.add(
                 RuleTechniqueMap(
                     rule_version_id=version.id,
                     technique_id=technique_id,
                     source="declared_tag",
-                    confirmed=False,
+                    confirmed=True,
                 )
             )
             added += 1

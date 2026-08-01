@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column, String, Integer, Boolean, DateTime, Enum, Float, ForeignKey, Index, JSON,
-    Text, create_engine,
+    Text, create_engine, inspect, text,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
@@ -51,6 +52,8 @@ class RuleVersion(Base):
     version_number = Column(Integer, nullable=False)
     yaml_content = Column(Text, nullable=False)
     mitre_techniques = Column(JSON, default=list)
+    author = Column(String(255), nullable=True)
+    license = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=_now)
     rule = relationship("DetectionRule", back_populates="versions")
     technique_mappings = relationship(
@@ -158,7 +161,13 @@ class DriftRecord(Base):
     detected_at = Column(DateTime, default=_now)
 
 
-def make_engine(db_url: str = "sqlite:///./ddt.db"):
+def make_engine(db_url: str | None = None):
+    """Create an engine using an explicit URL or the environment override.
+
+    ``DDT_DATABASE_URL`` lets tests and tooling select an isolated database
+    without changing the application default of ``sqlite:///./ddt.db``.
+    """
+    db_url = db_url or os.getenv("DDT_DATABASE_URL", "sqlite:///./ddt.db")
     connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
     return create_engine(db_url, connect_args=connect_args)
 
@@ -169,3 +178,12 @@ def make_session_factory(engine):
 
 def init_db(engine):
     Base.metadata.create_all(bind=engine)
+    # Existing deployments predate rule attribution metadata. ``create_all``
+    # does not add columns to an already-created table, so apply this small,
+    # idempotent compatibility migration before the ORM loads RuleVersion rows.
+    columns = {column["name"] for column in inspect(engine).get_columns("rule_versions")}
+    with engine.begin() as connection:
+        if "author" not in columns:
+            connection.execute(text("ALTER TABLE rule_versions ADD COLUMN author VARCHAR(255)"))
+        if "license" not in columns:
+            connection.execute(text("ALTER TABLE rule_versions ADD COLUMN license VARCHAR(64)"))

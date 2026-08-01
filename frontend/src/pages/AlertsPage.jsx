@@ -28,6 +28,9 @@ export default function AlertsPage() {
                 <AlertTriangle size={16} className="text-alert-400" />
                 <div>
                   <div className="text-sm text-graphite-100">{a.rule_title}</div>
+                  <div className="text-xs text-graphite-400">
+                    Author: {a.rule_author || "Unknown"}
+                  </div>
                   <div className="font-mono text-[11px] text-graphite-500">
                     {new Date(a.evaluated_at).toLocaleString()}
                   </div>
