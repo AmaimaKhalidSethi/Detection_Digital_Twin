@@ -15,7 +15,11 @@ from app.models.db import (
 from app.detection_engine.rule_manager import validate_rule_yaml
 from app.detection_engine.evaluator import evaluate_rule_versions_against_events
 from app.detection_engine.analysis import build_coverage_report, build_drift_report
-from app.telemetry.generators.synthetic_log_generator import run_simulation, TECHNIQUE_SIMULATIONS
+from app.telemetry.generators.synthetic_log_generator import (
+    available_simulation_techniques,
+    run_simulation,
+    simulation_coverage_gaps,
+)
 from app.mitre.data import all_techniques
 
 engine = make_engine()
@@ -63,7 +67,12 @@ def list_techniques():
 
 @app.get("/simulator/techniques")
 def list_simulatable_techniques():
-    return sorted(TECHNIQUE_SIMULATIONS.keys())
+    return available_simulation_techniques()
+
+
+@app.get("/simulator/coverage-gaps")
+def list_simulation_coverage_gaps():
+    return simulation_coverage_gaps()
 
 
 # --------------------------------------------------------- Rules (FR-01..03)
@@ -184,7 +193,7 @@ def delete_rule(rule_id: str, db: Session = Depends(get_db)):
 
 @app.post("/simulations")
 def run_simulation_endpoint(payload: SimulateRequest, db: Session = Depends(get_db)):
-    if payload.technique_id not in TECHNIQUE_SIMULATIONS:
+    if payload.technique_id not in available_simulation_techniques():
         raise HTTPException(status_code=400, detail=f"No simulation for technique {payload.technique_id}")
 
     run = SimulationRun(technique_id=payload.technique_id, status="running")

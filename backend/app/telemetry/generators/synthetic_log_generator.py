@@ -18,30 +18,16 @@ import random
 from typing import Callable
 
 from app.telemetry.schema import NormalizedEvent
-
-HOST_WIN = "LAB-WIN10"
-HOST_LINUX = "lab-ubuntu-01"
-
-
-def _win_event(**kwargs) -> NormalizedEvent:
-    defaults = dict(
-        source_type="synthetic",
-        sysmon_event_id=1,
-        host=HOST_WIN,
-        User="LAB-WIN10\\analyst",
-        ParentImage="C:\\Windows\\explorer.exe",
-        ParentCommandLine="C:\\Windows\\explorer.exe",
-        ParentProcessId=4200,
-        IntegrityLevel="Medium",
-    )
-    defaults.update(kwargs)
-    return NormalizedEvent(**defaults)
-
-
-def _linux_event(**kwargs) -> NormalizedEvent:
-    defaults = dict(source_type="synthetic", host=HOST_LINUX, User="1000")
-    defaults.update(kwargs)
-    return NormalizedEvent(**defaults)
+from app.telemetry.generators.atomic_red_team_loader import (
+    atomic_coverage_gaps,
+    get_atomic_test,
+    load_atomic_tests,
+)
+from app.telemetry.generators.atomic_telemetry_builder import (
+    _linux_event,
+    _win_event,
+    build_atomic_telemetry,
+)
 
 
 # ---- per-technique simulation functions -----------------------------------
@@ -168,9 +154,22 @@ TECHNIQUE_SIMULATIONS: dict[str, Callable[[str], list[NormalizedEvent]]] = {
 
 def run_simulation(technique_id: str, run_id: str) -> list[NormalizedEvent]:
     fn = TECHNIQUE_SIMULATIONS.get(technique_id)
-    if fn is None:
+    if fn is not None:
+        return fn(run_id)
+    atomic_test = get_atomic_test(technique_id)
+    if atomic_test is None:
         raise ValueError(f"No simulation defined for technique {technique_id}")
-    return fn(run_id)
+    return [build_atomic_telemetry(atomic_test, run_id)]
+
+
+def available_simulation_techniques() -> list[str]:
+    """All hand-written and usable Atomic-backed technique IDs."""
+    return sorted(set(TECHNIQUE_SIMULATIONS) | set(load_atomic_tests()))
+
+
+def simulation_coverage_gaps() -> list[str]:
+    """Vendored Atomic technique IDs not runnable by either simulator path."""
+    return sorted(set(atomic_coverage_gaps()) - set(TECHNIQUE_SIMULATIONS))
 
 
 # ---- benign baseline (for false-positive / specificity testing) -----------

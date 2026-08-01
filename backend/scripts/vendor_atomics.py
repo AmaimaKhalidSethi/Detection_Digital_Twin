@@ -8,14 +8,20 @@ startup only reads the already-vendored files.
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
-import subprocess
-import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.request import Request, urlopen
 
 
 REPOSITORY = "https://github.com/redcanaryco/atomic-red-team.git"
 PINNED_COMMIT = "1ba1dd8d9ce6f74700f7aec2e60de5632f667f03"
+GITHUB_TREE_URL = (
+    "https://api.github.com/repos/redcanaryco/atomic-red-team/git/trees/"
+    f"{PINNED_COMMIT}?recursive=1"
+)
+RAW_URL = "https://raw.githubusercontent.com/redcanaryco/atomic-red-team/{commit}/{path}"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 TARGET_ROOT = BACKEND_ROOT / "vendor" / "atomic-red-team"
 
@@ -50,20 +56,38 @@ def vendor_atomics(*, force: bool = False) -> int:
             raise FileExistsError(f"{TARGET_ROOT} already exists; use --force to replace it")
         shutil.rmtree(TARGET_ROOT)
 
-    with tempfile.TemporaryDirectory(prefix="atomic-red-team-") as temp_dir:
-        checkout = Path(temp_dir) / "atomic-red-team"
-        subprocess.run(
-            ["git", "clone", "--depth", "1", "--filter=blob:none", REPOSITORY, str(checkout)],
-            check=True,
-        )
-        subprocess.run(["git", "-C", str(checkout), "checkout", PINNED_COMMIT], check=True)
+    request = Request(GITHUB_TREE_URL, headers={"User-Agent": "detection-digital-twin-vendor"})
+    with urlopen(request, timeout=30) as response:
+        tree = json.load(response)["tree"]
+    yaml_paths = sorted(
+        entry["path"]
+        for entry in tree
+        if entry["type"] == "blob"
+        and entry["path"].startswith("atomics/")
+        and entry["path"].endswith(".yaml")
+    )
+    if not yaml_paths:
+        raise RuntimeError("Pinned Atomic Red Team revision contains no atomics YAML files")
 
-        source_atomics = checkout / "atomics"
-        target_atomics = TARGET_ROOT / "atomics"
-        for yaml_file in source_atomics.rglob("*.yaml"):
-            destination = target_atomics / yaml_file.relative_to(source_atomics)
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(yaml_file, destination)
+    target_atomics = TARGET_ROOT / "atomics"
+
+    def download(path: str) -> None:
+        request = Request(
+            RAW_URL.format(commit=PINNED_COMMIT, path=path),
+            headers={"User-Agent": "detection-digital-twin-vendor"},
+        )
+        with urlopen(request, timeout=30) as response:
+            content = response.read()
+        destination = target_atomics / Path(path).relative_to("atomics")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+
+    try:
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            list(pool.map(download, yaml_paths))
+    except Exception:
+        shutil.rmtree(TARGET_ROOT, ignore_errors=True)
+        raise
 
     (TARGET_ROOT / "LICENSE.txt").write_text(LICENSE_TEXT, encoding="utf-8")
     (TARGET_ROOT / "PROVENANCE.md").write_text(
@@ -78,7 +102,7 @@ def vendor_atomics(*, force: bool = False) -> int:
         f"{LICENSE_TEXT}```\n",
         encoding="utf-8",
     )
-    return len(list((TARGET_ROOT / "atomics").rglob("*.yaml")))
+    return len(yaml_paths)
 
 
 def main() -> None:

