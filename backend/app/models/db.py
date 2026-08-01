@@ -4,7 +4,8 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, String, Integer, Boolean, DateTime, ForeignKey, JSON, Text, create_engine,
+    Column, String, Integer, Boolean, DateTime, Enum, Float, ForeignKey, Index, JSON,
+    Text, create_engine,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
@@ -52,6 +53,69 @@ class RuleVersion(Base):
     mitre_techniques = Column(JSON, default=list)
     created_at = Column(DateTime, default=_now)
     rule = relationship("DetectionRule", back_populates="versions")
+    technique_mappings = relationship(
+        "RuleTechniqueMap", back_populates="rule_version", cascade="all, delete-orphan"
+    )
+
+
+class RuleTechniqueMap(Base):
+    """Technique evidence recorded independently for each rule version.
+
+    The source is part of the primary key so that a technique can have both a
+    declared tag and separately-confirmed brute-force evidence.
+    """
+
+    __tablename__ = "rule_technique_map"
+    __table_args__ = (
+        Index("ix_rule_technique_map_rule_version_id", "rule_version_id"),
+        Index("ix_rule_technique_map_technique_id", "technique_id"),
+    )
+
+    rule_version_id = Column(String, ForeignKey("rule_versions.id"), primary_key=True)
+    technique_id = Column(String(32), primary_key=True)
+    source = Column(
+        Enum(
+            "declared_tag",
+            "brute_force_confirmed",
+            "ai_suggested",
+            name="rule_technique_source",
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+        ),
+        primary_key=True,
+    )
+    confirmed = Column(Boolean, nullable=False, default=False)
+    confidence = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=_now, nullable=False)
+
+    rule_version = relationship("RuleVersion", back_populates="technique_mappings")
+
+
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    job_type = Column(String(64), nullable=False)
+    status = Column(
+        Enum(
+            "queued",
+            "running",
+            "done",
+            "failed",
+            name="job_status",
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+        ),
+        nullable=False,
+        default="queued",
+    )
+    progress_current = Column(Integer, nullable=False, default=0)
+    progress_total = Column(Integer, nullable=False, default=0)
+    result_summary = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=_now, nullable=False)
+    finished_at = Column(DateTime, nullable=True)
 
 
 class SimulationRun(Base):
@@ -74,6 +138,9 @@ class GeneratedLog(Base):
 
 class DetectionResult(Base):
     __tablename__ = "detection_results"
+    __table_args__ = (
+        Index("ix_detection_results_rule_version_id_simulation_run_id", "rule_version_id", "simulation_run_id"),
+    )
     id = Column(String, primary_key=True, default=_uuid)
     rule_version_id = Column(String, ForeignKey("rule_versions.id"), nullable=False)
     simulation_run_id = Column(String, ForeignKey("simulation_runs.id"), nullable=False)

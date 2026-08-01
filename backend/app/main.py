@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.models.db import (
     make_engine, make_session_factory, init_db,
-    DetectionRule, RuleVersion, SimulationRun, GeneratedLog, DetectionResult, DriftRecord,
+    DetectionRule, RuleVersion, RuleTechniqueMap, SimulationRun, GeneratedLog,
+    DetectionResult, DriftRecord,
 )
 from app.detection_engine.rule_manager import validate_rule_yaml
 from app.detection_engine.evaluator import evaluate_rule_versions_against_events
@@ -83,6 +84,16 @@ def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
         mitre_techniques=result.mitre_techniques or [],
     )
     db.add(version)
+    db.flush()
+    for technique_id in dict.fromkeys(result.mitre_techniques or []):
+        db.add(
+            RuleTechniqueMap(
+                rule_version_id=version.id,
+                technique_id=technique_id,
+                source="declared_tag",
+                confirmed=False,
+            )
+        )
     db.commit()
     return {
         "rule_id": rule.id,
@@ -108,6 +119,16 @@ def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(
         mitre_techniques=result.mitre_techniques or [],
     )
     db.add(version)
+    db.flush()
+    for technique_id in dict.fromkeys(result.mitre_techniques or []):
+        db.add(
+            RuleTechniqueMap(
+                rule_version_id=version.id,
+                technique_id=technique_id,
+                source="declared_tag",
+                confirmed=False,
+            )
+        )
     db.commit()
     return {"rule_id": rule.id, "version_id": version.id, "version_number": next_version_number}
 
@@ -125,7 +146,7 @@ def list_rules(db: Session = Depends(get_db)):
                 "status": r.status,
                 "version_number": lv.version_number if lv else None,
                 "version_id": lv.id if lv else None,
-                "mitre_techniques": lv.mitre_techniques if lv else [],
+                "mitre_techniques": sorted({m.technique_id for m in lv.technique_mappings}) if lv else [],
             }
         )
     return out
@@ -142,7 +163,8 @@ def get_rule(rule_id: str, db: Session = Depends(get_db)):
         "status": rule.status,
         "versions": [
             {"version_id": v.id, "version_number": v.version_number, "yaml_content": v.yaml_content,
-             "mitre_techniques": v.mitre_techniques, "created_at": v.created_at.isoformat()}
+             "mitre_techniques": sorted({m.technique_id for m in v.technique_mappings}),
+             "created_at": v.created_at.isoformat()}
             for v in sorted(rule.versions, key=lambda v: v.version_number)
         ],
     }
@@ -283,9 +305,8 @@ def coverage(db: Session = Depends(get_db)):
         lv = r.latest_version
         if not lv:
             continue
-        rule_techniques[lv.id] = lv.mitre_techniques or []
-
-        own_technique_ids = lv.mitre_techniques or []
+        own_technique_ids = [m.technique_id for m in lv.technique_mappings]
+        rule_techniques[lv.id] = own_technique_ids
         passed_on_own_technique = False
         if own_technique_ids:
             results = (
