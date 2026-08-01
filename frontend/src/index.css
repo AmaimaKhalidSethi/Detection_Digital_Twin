@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+/*
+  Design identity: "SOC console".
+  A detection-testing tool an analyst leaves open all day next to a real
+  SIEM -- so it reads as instrumentation, not a marketing surface. Dark
+  graphite base (not pure black, has a faint green cast to nod at
+  phosphor-terminal ancestry without literally doing green-on-black).
+  Signal green = a rule is firing / covered. Amber = blind spot / drift.
+  Red = active alert. Monospace is reserved for anything the analyst
+  would actually copy-paste: rule titles, technique IDs, field names,
+  command lines.
+*/
+@theme {
+  --color-graphite-950: #0a0f0d;
+  --color-graphite-900: #101613;
+  --color-graphite-800: #161f1b;
+  --color-graphite-700: #202b26;
+  --color-graphite-600: #2c3a33;
+  --color-graphite-500: #46584f;
+  --color-graphite-400: #6b8078;
+  --color-graphite-300: #97a89f;
+  --color-graphite-200: #c4d1cb;
+  --color-graphite-100: #e6ede9;
+
+  --color-signal-500: #35d488;
+  --color-signal-400: #5fe3a3;
+  --color-signal-600: #21a86a;
+
+  --color-amber-500: #eab040;
+  --color-amber-400: #f2c368;
+
+  --color-alert-500: #ef5757;
+  --color-alert-400: #f47f7f;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-graphite-950);
+  color: var(--color-graphite-100);
+  font-family: var(--font-sans);
+}
+
+.console-bg {
+  background-image:
+    linear-gradient(var(--color-graphite-800) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-graphite-800) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+
+::selection {
+  background-color: var(--color-signal-600);
+  color: var(--color-graphite-950);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-signal-400);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
