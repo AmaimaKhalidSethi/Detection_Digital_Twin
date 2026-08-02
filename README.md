@@ -33,7 +33,6 @@ cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8123
 ```
 
 On macOS/Linux, use:
@@ -43,6 +42,23 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+If you want to use the optional AI features, create a local environment file from the repo root before starting the backend:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+```bash
+cp .env.example .env
+```
+
+Then edit the new `.env` file and add one or more API keys for Groq, Gemini, or OpenAI. The backend loads these values automatically through `python-dotenv`.
+
+Start the API:
+
+```powershell
 uvicorn app.main:app --reload --port 8123
 ```
 
@@ -74,14 +90,14 @@ VITE_API_URL=http://127.0.0.1:8123
 
 ### 3. Optional AI features
 
-AI suggestions and alert explanations are optional. If you want to enable them, set one of the following environment variables before starting the backend:
+AI suggestions and alert explanations are optional. If you want to enable them, add one of the following keys to the local `.env` file created above:
 
-```powershell
-$env:GROQ_API_KEY="your-groq-key"
+```env
+GROQ_API_KEY=your-groq-key
 # or
-$env:GEMINI_API_KEY="your-gemini-key"
+GEMINI_API_KEY=your-gemini-key
 # or
-$env:OPENAI_API_KEY="your-openai-key"
+OPENAI_API_KEY=your-openai-key
 ```
 
 If no key is configured, the AI features remain disabled and the app continues to work normally.
