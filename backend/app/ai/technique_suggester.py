@@ -4,7 +4,10 @@ import os
 import re
 from typing import Protocol
 
+from dotenv import load_dotenv
 from sigma.rule import SigmaRule
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"))
 
 from app.detection_engine.evaluator import evaluate_rule_version_against_events
 from app.models.db import RuleTechniqueMap, RuleVersion
