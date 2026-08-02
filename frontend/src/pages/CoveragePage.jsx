@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { GitCommitHorizontal } from "lucide-react";
+import { Download, GitCommitHorizontal } from "lucide-react";
 import { api } from "../lib/api";
-import { Panel, Badge, EmptyState } from "../components/ui";
+import { Panel, Badge, Button, EmptyState } from "../components/ui";
 
 function CoverageCell({ row }) {
   const state = !row.has_rule ? "none" : row.rule_passes ? "covered" : "failing";
@@ -51,6 +51,20 @@ export default function CoveragePage() {
       <Panel
         title="ATT&CK coverage matrix"
         eyebrow={`${coveredCount} / ${coverage.length} techniques covered`}
+        actions={
+          <Button variant="secondary" className="inline-flex items-center gap-2" onClick={async () => {
+            const layer = await api.navigatorLayer();
+            const blob = new Blob([JSON.stringify(layer, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "coverage-navigator-layer.json";
+            link.click();
+            URL.revokeObjectURL(url);
+          }}>
+            <Download size={14} />Export layer
+          </Button>
+        }
       >
         {loading ? (
           <p className="text-sm text-graphite-400">Loading...</p>

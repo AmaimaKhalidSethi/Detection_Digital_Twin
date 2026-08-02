@@ -19,12 +19,23 @@ async function request(path, options = {}) {
 
 export const api = {
   listRules: () => request("/rules"),
+  searchRules: (q = "", filters = {}) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (filters.tactic) params.set("tactic", filters.tactic);
+    if (filters.platform) params.set("platform", filters.platform);
+    if (filters.status) params.set("status", filters.status);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return request(`/rules/search${suffix}`);
+  },
   getRule: (ruleId) => request(`/rules/${ruleId}`),
   uploadRule: (yamlContent) =>
     request("/rules", { method: "POST", body: JSON.stringify({ yaml_content: yamlContent }) }),
   updateRule: (ruleId, yamlContent) =>
     request(`/rules/${ruleId}`, { method: "PUT", body: JSON.stringify({ yaml_content: yamlContent }) }),
   deleteRule: (ruleId) => request(`/rules/${ruleId}`, { method: "DELETE" }),
+  testRule: (ruleId) => request(`/rules/${ruleId}/test`, { method: "POST" }),
+  suggestTechniques: (ruleId) => request(`/rules/${ruleId}/suggest-techniques`, { method: "POST" }),
 
   listTechniques: () => request("/mitre/techniques"),
   listSimulatableTechniques: () => request("/simulator/techniques"),
@@ -36,6 +47,8 @@ export const api = {
     request("/evaluate", { method: "POST", body: JSON.stringify({ simulation_run_id: simulationRunId }) }),
 
   listAlerts: () => request("/alerts"),
+  explainAlert: (alertId) => request(`/alerts/${alertId}/explain`),
   coverage: () => request("/coverage"),
+  navigatorLayer: () => request("/coverage/navigator-layer"),
   drift: () => request("/drift"),
 };

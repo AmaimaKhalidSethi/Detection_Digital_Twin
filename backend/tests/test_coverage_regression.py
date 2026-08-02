@@ -32,6 +32,15 @@ def client():
     return TestClient(app)
 
 
+def test_declared_rule_without_evaluation_is_not_marked_as_passing(client):
+    """A declared rule should stay unverified until a technique-specific evaluation passes."""
+    client.post("/rules", json={"yaml_content": POWERSHELL_RULE})
+
+    coverage = {row["technique_id"]: row for row in client.get("/coverage").json()}
+    assert coverage["T1059.001"]["rule_passes"] is False
+    assert coverage["T1059.001"]["verification_state"] == "declared_not_verified"
+
+
 def test_evaluating_unrelated_technique_does_not_break_coverage(client):
     """
     Regression test: running a simulation for a technique the rule does NOT

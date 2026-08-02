@@ -1,73 +1,118 @@
-# Detection Digital Twin — SOC Digital Twin Platform
+# Detection Digital Twin
 
-A working MVP of the project described in `documentation/Detection_Digital_Twin_SRS_SDD.docx`.
+Detection Digital Twin is a local SOC detection engineering prototype for testing Sigma rules against simulated ATT&CK telemetry. It combines a FastAPI backend, a React/Vite frontend, and a lightweight evaluation pipeline so you can upload rules, run simulations, inspect coverage, and review AI-assisted explanations.
 
-## What's real here
+## What the project does
 
-- **Detection engine** (`backend/app/detection_engine/matcher.py`) evaluates
-  real [pySigma](https://github.com/SigmaHQ/pySigma)-parsed Sigma rules
-  directly against normalized event dicts. pySigma itself is a parser/
-  converter, not an evaluator, so this module is the missing piece, built
-  directly on pySigma's real condition-tree object model.
-- **Starter rule** (`backend/rules/`) is an unmodified rule pulled from the
-  public [SigmaHQ/sigma](https://github.com/SigmaHQ/sigma) repository.
-- **Telemetry schema** mirrors real Sysmon Event ID 1 and Linux auditd
-  SYSCALL/EXECVE field names, so community Sigma rules work unmodified.
-- **14 automated tests pass**, including an integration test that uploads
-  the real SigmaHQ rule, simulates its technique, and confirms it fires
-  with zero false positives on a benign baseline.
-- **React + Tailwind frontend** (Vite) — Rules / Simulate / Alerts /
-  Coverage pages, verified running end-to-end in a real browser.
+- Validates and stores Sigma rules with rule-version tracking
+- Evaluates rules against normalized telemetry using a real pySigma condition-tree-based matcher
+- Simulates ATT&CK-style attack techniques and runs rule evaluations against them
+- Builds coverage and drift reports scoped per rule and per technique
+- Supports AI-assisted technique suggestions and alert explanations through provider-agnostic backends such as Groq, Gemini, or OpenAI
+- Provides a browser-based UI for rules, simulations, alerts, and coverage
 
-## Running it
+## Current status
 
-### Backend
-```bash
+The implementation is a working MVP and has been verified locally:
+
+- Backend test suite: 29 passed
+- Frontend production build: successful
+
+## Tech stack
+
+- Backend: FastAPI, SQLAlchemy, pySigma, pytest
+- Frontend: React, Vite, Tailwind CSS, Recharts, lucide-react
+- Data: SQLite for local development
+
+## Quick start
+
+### 1. Backend
+
+```powershell
 cd backend
-python3 -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8123
 ```
-API docs at http://127.0.0.1:8123/docs (FastAPI's auto-generated Swagger UI).
 
-Run the test suite:
+On macOS/Linux, use:
+
 ```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8123
+```
+
+The API will be available at:
+
+- Swagger UI: http://127.0.0.1:8123/docs
+- OpenAPI schema: http://127.0.0.1:8123/openapi.json
+
+Run the backend tests:
+
+```powershell
 pytest tests/ -v
 ```
 
-### Frontend
-```bash
+### 2. Frontend
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
-Open http://127.0.0.1:5173. The frontend expects the backend at
-`http://127.0.0.1:8123` (override with a `.env` file: `VITE_API_URL=...`).
 
-## Known limitations (be upfront about these in your report/demo)
+Then open http://127.0.0.1:5173.
 
-- MITRE ATT&CK data (`backend/app/mitre/data.py`) is a small curated table
-  matching the 8 simulated techniques, not the full ATT&CK STIX bundle.
-  Swapping in `mitreattack-python` for the complete dataset is a documented
-  stretch goal (Section 8 of the SDD) and doesn't require changing any
-  other module.
-- SQLite is used for simplicity; the SDD's Postgres/Docker deployment path
-  (Section 9) is not wired up here.
-- Auth (FR-12) is not implemented — there's no login; all endpoints are
-  open. Fine for a local demo, not for anything else.
-- The starter rule library ships with one real SigmaHQ rule; the SDD's
-  target of 15-25 curated techniques (Section 14) means adding more real
-  Sigma rules + matching simulations to `synthetic_log_generator.py`.
-- Two real bugs were caught and fixed during end-to-end browser testing
-  (see git-history-style notes in `detection_engine/analysis.py` and
-  `main.py`'s `/coverage` endpoint): both coverage and drift detection
-  originally compared a rule's *latest* evaluation regardless of which
-  technique was simulated, which could make a working rule look broken
-  just because you'd tested it against an unrelated technique afterward.
-  Both are now scoped per-technique and covered by regression tests.
+The frontend expects the backend at http://127.0.0.1:8123 by default. You can override that with a frontend environment file if needed:
 
-## Project layout
+```env
+VITE_API_URL=http://127.0.0.1:8123
+```
 
-See `documentation/Detection_Digital_Twin_SRS_SDD.docx` Section 11 for the
-full intended directory structure and Section 13 for the module-by-module
-code plan this implementation follows.
+### 3. Optional AI features
+
+AI suggestions and alert explanations are optional. If you want to enable them, set one of the following environment variables before starting the backend:
+
+```powershell
+$env:GROQ_API_KEY="your-groq-key"
+# or
+$env:GEMINI_API_KEY="your-gemini-key"
+# or
+$env:OPENAI_API_KEY="your-openai-key"
+```
+
+If no key is configured, the AI features remain disabled and the app continues to work normally.
+
+## Project structure
+
+```text
+backend/
+  app/
+    ai/
+    detection_engine/
+    models/
+    telemetry/
+    mitre/
+  rules/
+  tests/
+frontend/
+  src/
+    components/
+    pages/
+    lib/
+```
+
+## Notes and limitations
+
+- The ATT&CK dataset in the project is a curated local subset for the MVP and is not a full STIX export.
+- SQLite is used for local development and demo scenarios.
+- Authentication and production-grade deployment controls are not implemented yet.
+- The starter rule set is intentionally small; expanding it with more Sigma rules and simulations will improve coverage breadth.
+
+## Documentation
+
+The original product requirements and system design notes are in the documentation folder, including the SRS/SDD document referenced by the earlier prototype.

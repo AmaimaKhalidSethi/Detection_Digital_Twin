@@ -18,6 +18,10 @@ from app.detection_engine.evaluator import (
     evaluate_rule_versions_against_events,
 )
 from app.detection_engine.analysis import build_coverage_report, build_drift_report
+from app.ai.rule_search import search_rules, _extract_yaml_scalar
+from app.ai.technique_suggester import confirm_ai_suggestions, suggest_rule_techniques
+from app.ai.alert_explainer import explain_match
+from app.technique_maps import upsert_rule_technique_map
 from app.telemetry.generators.synthetic_log_generator import (
     available_simulation_techniques,
     run_simulation,
@@ -69,31 +73,64 @@ def _active_rule_versions(db: Session) -> list[RuleVersion]:
     return sorted(versions, key=lambda v: v.version_number)
 
 
-def _upsert_rule_technique_map(
-    db: Session,
-    rule_version_id: str,
-    technique_id: str,
-    source: str,
-    confirmed: bool = True,
-    confidence: float | None = None,
-) -> None:
-    row = (
-        db.query(RuleTechniqueMap)
-        .filter_by(rule_version_id=rule_version_id, technique_id=technique_id, source=source)
-        .one_or_none()
+def _mapping_source_priority(source: str) -> int:
+    return {"brute_force_confirmed": 3, "declared_tag": 2, "ai_suggested": 1}.get(source, 0)
+
+
+def _candidate_techniques_for_rule_version(rule_version: RuleVersion, technique_meta: dict | None = None) -> list[str]:
+    technique_meta = technique_meta or all_techniques()
+    declared_mapped_techniques = sorted(
+        {
+            mapping.technique_id
+            for mapping in rule_version.technique_mappings
+            if getattr(mapping, "source", "declared_tag") == "declared_tag"
+        }
     )
-    if row is None:
-        row = RuleTechniqueMap(
-            rule_version_id=rule_version_id,
-            technique_id=technique_id,
-            source=source,
-            confirmed=confirmed,
-            confidence=confidence,
+    techniques_to_test = set(declared_mapped_techniques)
+    tactic_names = {
+        technique_meta[technique_id]["tactic"]
+        for technique_id in declared_mapped_techniques
+        if technique_id in technique_meta
+    }
+    for tactic_name in tactic_names:
+        for technique_id in sorted(technique_meta):
+            if technique_id in declared_mapped_techniques:
+                continue
+            if technique_meta[technique_id].get("tactic") != tactic_name:
+                continue
+            techniques_to_test.add(technique_id)
+            break
+    return sorted(techniques_to_test)
+
+
+def _verified_techniques_for_rule_version(db: Session, rule_version_id: str) -> set[str]:
+    verified = {
+        row.technique_id
+        for row in (
+            db.query(RuleTechniqueMap)
+            .filter(
+                RuleTechniqueMap.rule_version_id == rule_version_id,
+                RuleTechniqueMap.source == "brute_force_confirmed",
+                RuleTechniqueMap.confirmed.is_(True),
+            )
+            .all()
         )
-        db.add(row)
-        return
-    row.confirmed = confirmed
-    row.confidence = confidence
+    }
+    matched_techniques = {
+        row[0]
+        for row in (
+            db.query(SimulationRun.technique_id)
+            .join(DetectionResult, DetectionResult.simulation_run_id == SimulationRun.id)
+            .filter(
+                DetectionResult.rule_version_id == rule_version_id,
+                DetectionResult.matched.is_(True),
+            )
+            .distinct()
+            .all()
+        )
+    }
+    verified.update(matched_techniques)
+    return verified
 
 
 def _run_full_matrix_evaluation(job_id: str) -> None:
@@ -107,16 +144,16 @@ def _run_full_matrix_evaluation(job_id: str) -> None:
         db.commit()
 
         active_versions = _active_rule_versions(db)
-        techniques = sorted(set(available_simulation_techniques()))
-        job.progress_total = len(active_versions) * len(techniques)
+        simulatable_techniques = sorted(available_simulation_techniques())
+        job.progress_total = len(active_versions) * len(simulatable_techniques)
         db.commit()
 
-        for technique_id in techniques:
-            events = run_simulation(technique_id, f"{job_id}:{technique_id}")
-            for rule_version in active_versions:
+        for rule_version in active_versions:
+            for technique_id in simulatable_techniques:
+                events = run_simulation(technique_id, f"{job_id}:{rule_version.id}:{technique_id}")
                 result = evaluate_rule_version_against_events(rule_version.id, rule_version.yaml_content, events)
                 if result["matched"]:
-                    _upsert_rule_technique_map(
+                    upsert_rule_technique_map(
                         db,
                         rule_version.id,
                         technique_id,
@@ -129,7 +166,7 @@ def _run_full_matrix_evaluation(job_id: str) -> None:
         job.status = "done"
         job.result_summary = {
             "rules_evaluated": len(active_versions),
-            "techniques_evaluated": len(techniques),
+            "techniques_evaluated": job.progress_total,
         }
         job.finished_at = datetime.now(timezone.utc)
         db.commit()
@@ -238,17 +275,26 @@ def list_rules(db: Session = Depends(get_db)):
     out = []
     for r in rules:
         lv = r.latest_version
+        title = r.title
+        if lv and lv.yaml_content:
+            title = _extract_yaml_scalar(lv.yaml_content, "title") or title
         out.append(
             {
                 "rule_id": r.id,
-                "title": r.title,
+                "title": title,
                 "status": r.status,
                 "version_number": lv.version_number if lv else None,
                 "version_id": lv.id if lv else None,
+                "author": lv.author if lv else None,
                 "mitre_techniques": sorted({m.technique_id for m in lv.technique_mappings}) if lv else [],
             }
         )
     return out
+
+
+@app.get("/rules/search")
+def search_rule_index(q: str = "", tactic: str | None = None, platform: str | None = None, status: str | None = None, db: Session = Depends(get_db)):
+    return search_rules(db, q, tactic=tactic, platform=platform, status=status)
 
 
 @app.get("/rules/{rule_id}")
@@ -263,6 +309,7 @@ def get_rule(rule_id: str, db: Session = Depends(get_db)):
         "versions": [
             {"version_id": v.id, "version_number": v.version_number, "yaml_content": v.yaml_content,
              "mitre_techniques": sorted({m.technique_id for m in v.technique_mappings}),
+             "author": v.author,
              "created_at": v.created_at.isoformat()}
             for v in sorted(rule.versions, key=lambda v: v.version_number)
         ],
@@ -345,6 +392,25 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
     }
 
 
+@app.post("/rules/{rule_id}/suggest-techniques")
+def suggest_rule_techniques_endpoint(rule_id: str, db: Session = Depends(get_db)):
+    rule = db.get(DetectionRule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    rule_version = rule.latest_version
+    if not rule_version:
+        raise HTTPException(status_code=404, detail="Rule version not found")
+
+    suggestions = suggest_rule_techniques(rule_version, db, rule_version.yaml_content)
+    confirm_ai_suggestions(rule_version, db, suggestions)
+    db.commit()
+    return {
+        "rule_version_id": rule_version.id,
+        "suggestions": suggestions,
+        "source": "ai_suggested",
+    }
+
+
 @app.post("/rules/{rule_id}/test")
 def test_rule(rule_id: str, db: Session = Depends(get_db)):
     rule = db.get(DetectionRule, rule_id)
@@ -354,21 +420,15 @@ def test_rule(rule_id: str, db: Session = Depends(get_db)):
     if not rule_version:
         raise HTTPException(status_code=404, detail="Rule version not found")
 
-    mapped_techniques = sorted({mapping.technique_id for mapping in rule_version.technique_mappings})
-    techniques_to_test = set(mapped_techniques)
     technique_meta = all_techniques()
-    tactic_names = {technique_meta[technique_id]["tactic"] for technique_id in mapped_techniques if technique_id in technique_meta}
-    for tactic_name in tactic_names:
-        for technique_id in sorted(technique_meta):
-            if technique_id in mapped_techniques:
-                continue
-            if technique_meta[technique_id].get("tactic") != tactic_name:
-                continue
-            techniques_to_test.add(technique_id)
-            if len(techniques_to_test) >= 8:
-                break
-        if len(techniques_to_test) >= 8:
-            break
+    mapped_techniques = sorted(
+        {
+            mapping.technique_id
+            for mapping in rule_version.technique_mappings
+            if getattr(mapping, "source", "declared_tag") == "declared_tag"
+        }
+    )
+    techniques_to_test = _candidate_techniques_for_rule_version(rule_version, technique_meta)
 
     results = []
     for technique_id in sorted(techniques_to_test):
@@ -421,6 +481,15 @@ def evaluate(payload: EvaluateRequest, db: Session = Depends(get_db)):
         db.add(dr)
         if res["matched"]:
             alerts.append(dr)
+            rule_version = db.get(RuleVersion, res["rule_version_id"])
+            if rule_version is not None:
+                upsert_rule_technique_map(
+                    db,
+                    res["rule_version_id"],
+                    run.technique_id,
+                    "brute_force_confirmed",
+                    confirmed=True,
+                )
     db.commit()
 
     return {
@@ -457,6 +526,32 @@ def list_alerts(db: Session = Depends(get_db)):
     return out
 
 
+@app.get("/alerts/{alert_id}/explain")
+def explain_alert(alert_id: str, db: Session = Depends(get_db)):
+    result = db.get(DetectionResult, alert_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    rule_version = db.get(RuleVersion, result.rule_version_id)
+    if not rule_version:
+        raise HTTPException(status_code=404, detail="Rule version not found")
+    run = db.get(SimulationRun, result.simulation_run_id)
+    event = None
+    if run is not None:
+        logs = db.query(GeneratedLog).filter(GeneratedLog.simulation_run_id == run.id).all()
+        if logs:
+            matched_log = next((log for log in logs if log.id == result.matched_event_id), None)
+            event = matched_log.normalized_event if matched_log else logs[0].normalized_event
+    explanation = explain_match(rule_version.yaml_content, event or {}, None)
+    return {
+        "alert_id": result.id,
+        "rule_title": rule_version.rule.title if rule_version.rule else None,
+        "rule_author": rule_version.author,
+        "matched": result.matched,
+        "explanation": explanation,
+        "technique_id": run.technique_id if run else None,
+    }
+
+
 # ------------------------------------------------------- Coverage / Drift (FR-09/10)
 
 @app.get("/coverage")
@@ -470,28 +565,50 @@ def coverage(db: Session = Depends(get_db)):
     though it never got a fair shot at the technique it actually targets.
     """
     rule_techniques = {}
-    latest_pass_by_rule_version = {}
+    verified_techniques_by_rule_version: dict[str, set[str]] = {}
     for lv in _active_rule_versions(db):
-        own_technique_ids = sorted({mapping.technique_id for mapping in lv.technique_mappings})
-        rule_techniques[lv.id] = own_technique_ids
-        passed_on_own_technique = False
-        if own_technique_ids:
-            mapping_rows = (
-                db.query(RuleTechniqueMap)
-                .filter(RuleTechniqueMap.rule_version_id == lv.id)
-                .filter(RuleTechniqueMap.technique_id.in_(own_technique_ids))
-                .all()
-            )
-            if mapping_rows:
-                preferred_rows = {}
-                for row in mapping_rows:
-                    current = preferred_rows.get(row.technique_id)
-                    if current is None or _mapping_source_priority(row.source) > _mapping_source_priority(current.source):
-                        preferred_rows[row.technique_id] = row
-                passed_on_own_technique = any(row.confirmed for row in preferred_rows.values())
-        latest_pass_by_rule_version[lv.id] = passed_on_own_technique
+        mapping_rows = db.query(RuleTechniqueMap).filter(RuleTechniqueMap.rule_version_id == lv.id).all()
+        preferred_rows = {}
+        for row in mapping_rows:
+            current = preferred_rows.get(row.technique_id)
+            if current is None or _mapping_source_priority(row.source) > _mapping_source_priority(current.source):
+                preferred_rows[row.technique_id] = row
 
-    return build_coverage_report(rule_techniques, latest_pass_by_rule_version)
+        own_technique_ids = sorted(preferred_rows)
+        rule_techniques[lv.id] = own_technique_ids
+        verified_techniques_by_rule_version[lv.id] = _verified_techniques_for_rule_version(db, lv.id)
+
+    return build_coverage_report(rule_techniques, verified_techniques_by_rule_version)
+
+
+@app.get("/coverage/navigator-layer")
+def coverage_navigator_layer(db: Session = Depends(get_db)):
+    coverage_rows = coverage(db=db)
+    techniques = []
+    for row in coverage_rows:
+        if not row["has_rule"]:
+            continue
+        techniques.append(
+            {
+                "techniqueID": row["technique_id"],
+                "tactic": row["tactic"],
+                "score": 100 if row["rule_passes"] else 0,
+                "enabled": True,
+                "color": "#35d488" if row["rule_passes"] else "#eab040",
+                "comment": "verified" if row["rule_passes"] else "declared or pending verification",
+            }
+        )
+    return {
+        "version": "4.5",
+        "name": "Detection Digital Twin coverage",
+        "domain": "mitre-attack",
+        "description": "Coverage view derived from verified brute-force matches.",
+        "filters": {"platforms": ["Windows"]},
+        "sorting": 0,
+        "hideDisabled": False,
+        "gradient": {"colors": ["#ffffff", "#35d488"], "minValue": 0, "maxValue": 100},
+        "techniques": techniques,
+    }
 
 
 @app.get("/drift")

@@ -5,13 +5,15 @@ from app.mitre.data import all_techniques
 
 def build_coverage_report(
     rule_techniques: dict[str, list[str]],  # rule_version_id -> [technique_ids]
-    latest_pass_by_rule_version: dict[str, bool],  # rule_version_id -> matched (latest run)
+    verified_techniques_by_rule_version: dict[str, set[str]],  # rule_version_id -> verified technique_ids
 ) -> list[dict]:
     """
     For every technique in the curated MITRE library, determine:
       - has_rule: is any rule tagged with this technique?
-      - rule_passes: did at least one of those rules match its own
-        simulation telemetry on the latest run?
+      - rule_passes: did any rule for this technique receive a verified
+        brute-force confirmation for that specific (rule_version_id, technique_id) pair?
+      - verification_state: whether the rule is passing, declared but not yet verified,
+        or not applicable for this technique.
     This directly implements FR-09 (coverage report / blind-spot list).
     """
     technique_to_rule_versions: dict[str, list[str]] = {t: [] for t in all_techniques()}
@@ -23,7 +25,13 @@ def build_coverage_report(
     for technique_id, meta in all_techniques().items():
         rule_version_ids = technique_to_rule_versions.get(technique_id, [])
         has_rule = len(rule_version_ids) > 0
-        rule_passes = any(latest_pass_by_rule_version.get(rv, False) for rv in rule_version_ids)
+        rule_passes = any(
+            technique_id in verified_techniques_by_rule_version.get(rv, set())
+            for rv in rule_version_ids
+        )
+        verification_state = "no_rule"
+        if has_rule:
+            verification_state = "passing" if rule_passes else "declared_not_verified"
         report.append(
             {
                 "technique_id": technique_id,
@@ -31,6 +39,7 @@ def build_coverage_report(
                 "tactic": meta["tactic"],
                 "has_rule": has_rule,
                 "rule_passes": rule_passes,
+                "verification_state": verification_state,
                 "blind_spot": not has_rule or not rule_passes,
             }
         )

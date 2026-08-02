@@ -5,6 +5,16 @@ from sigma.rule import SigmaRule
 from app.detection_engine.matcher import RuleMatcher
 
 
+def _normalize_event(event) -> dict:
+    if isinstance(event, dict):
+        return event
+    if hasattr(event, "to_dict"):
+        return event.to_dict()
+    if hasattr(event, "__dict__"):
+        return {k: v for k, v in vars(event).items() if v is not None and k != "raw"}
+    return dict(event)
+
+
 def evaluate_rule_version_against_events(
     rule_version_id: str,
     yaml_content: str,
@@ -17,8 +27,9 @@ def evaluate_rule_version_against_events(
     except Exception:
         return {"rule_version_id": rule_version_id, "matched": False, "matched_event_index": None}
 
+    normalized_events = [_normalize_event(event) for event in events]
     matched_index = None
-    for i, event in enumerate(events):
+    for i, event in enumerate(normalized_events):
         if matcher.match(event).matched:
             matched_index = i
             break
