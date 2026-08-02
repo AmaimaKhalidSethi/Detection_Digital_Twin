@@ -64,7 +64,6 @@ cd frontend
 npm install
 npm run dev
 ```
-
 Then open http://127.0.0.1:5173.
 
 The frontend expects the backend at http://127.0.0.1:8123 by default. You can override that with a frontend environment file if needed:
