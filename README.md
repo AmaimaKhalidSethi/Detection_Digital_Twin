@@ -90,7 +90,7 @@ VITE_API_URL=http://127.0.0.1:8123
 
 ### 3. Optional AI features
 
-AI suggestions and alert explanations are optional. If you want to enable them, add one of the following keys to the local `.env` file created above:
+AI suggestions and alert explanations are optional. If you want to enable them, add one of the following keys to the local `.env` file created above
 
 ```env
 GROQ_API_KEY=your-groq-key
