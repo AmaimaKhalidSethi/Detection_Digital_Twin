@@ -62,7 +62,7 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
-
+backend/.env
 # ---------- Logs ----------
 logs/
 *.log
