@@ -58,6 +58,40 @@ def test_numeric_field_match():
     assert not matcher.match({"EventID": 2}).matched
 
 
+def test_and_condition_false_reports_first_failure_reason():
+    matcher = RuleMatcher(_rule("sel_a and sel_b"))
+    result = matcher.match({"FieldA": "valueA"})
+    assert not result.matched
+    assert result.failure_reasons == [
+        {
+            "field": "FieldB",
+            "reason": "field_missing",
+            "expected": "*needle*",
+            "actual": None,
+        }
+    ]
+
+
+def test_or_condition_false_reports_all_failure_reasons():
+    matcher = RuleMatcher(_rule("sel_a or sel_b"))
+    result = matcher.match({"FieldA": "nope", "FieldB": "nope"})
+    assert not result.matched
+    assert result.failure_reasons == [
+        {
+            "field": "FieldA",
+            "reason": "value_mismatch",
+            "expected": "valueA",
+            "actual": "nope",
+        },
+        {
+            "field": "FieldB",
+            "reason": "value_mismatch",
+            "expected": "*needle*",
+            "actual": "nope",
+        },
+    ]
+
+
 def test_endswith_modifier():
     rule = SigmaRule.from_yaml(
         """

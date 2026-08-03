@@ -99,7 +99,7 @@ export default function CoveragePage() {
         )}
       </Panel>
 
-      <Panel title="Drift report" eyebrow="FR-10">
+      <Panel title="Drift report" eyebrow="Drift detection">
         {drift.length === 0 ? (
           <EmptyState
             title="No drift detected"

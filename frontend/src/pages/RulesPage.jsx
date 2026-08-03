@@ -103,7 +103,7 @@ export default function RulesPage() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-      <Panel title="Upload Sigma rule" eyebrow="FR-01 / FR-02" className="lg:self-start">
+      <Panel title="Upload Sigma rule" eyebrow="Rule import" className="lg:self-start">
         <form onSubmit={handleUpload} className="space-y-3">
           <textarea
             value={yamlText}
@@ -112,6 +112,9 @@ export default function RulesPage() {
             rows={16}
             className="w-full resize-y rounded-md border border-graphite-600 bg-graphite-950 px-3 py-2 font-mono text-xs text-graphite-100 outline-none focus:border-signal-500"
           />
+          <p className="font-mono text-[11px] leading-relaxed text-graphite-500">
+            When uploaded, the rule is validated with pySigma and saved as a new rule version.
+          </p>
           <ErrorNote message={uploadError} />
           <Button type="submit" disabled={uploading} className="inline-flex items-center gap-2">
             <FileUp size={14} />

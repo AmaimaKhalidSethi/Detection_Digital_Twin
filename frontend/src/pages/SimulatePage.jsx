@@ -47,7 +47,7 @@ export default function SimulatePage() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-      <Panel title="Run a technique" eyebrow="FR-05" className="lg:col-span-2 lg:self-start">
+      <Panel title="Run a technique" eyebrow="Attack simulation" className="lg:col-span-2 lg:self-start">
         <div className="space-y-3">
           <label className="block font-mono text-[11px] uppercase tracking-widest text-graphite-400">
             MITRE ATT&amp;CK technique

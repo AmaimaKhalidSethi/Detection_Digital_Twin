@@ -40,6 +40,8 @@ from sigma.conditions import (
 from sigma.rule import SigmaRule
 from sigma.types import SigmaNumber, SigmaString
 
+FailureReason = dict[str, str | None]
+
 
 @dataclass
 class MatchResult:
@@ -51,13 +53,30 @@ class MatchResult:
     matched_fields: list[tuple[str, str]] = field(default_factory=list)
     matched_field: str | None = None
     matched_value: str | None = None
+    # When a rule does not match, these describe why it failed. For AND
+    # combinations the first failing leaf is returned; for OR combinations all
+    # failing leaves are returned so callers can see why no branch succeeded.
+    failure_reasons: list[FailureReason] = field(default_factory=list)
 
 
-def _leaf_matches(node, event: dict) -> tuple[bool, str | None, str | None]:
+def _make_failure_reason(field_name: str, reason: str, expected: str, actual: str | None) -> FailureReason:
+    return {
+        "field": field_name,
+        "reason": reason,
+        "expected": expected,
+        "actual": actual,
+    }
+
+
+def _leaf_matches(
+    node,
+    event: dict,
+) -> tuple[bool, str | None, str | None, FailureReason | None]:
     """Evaluate a single leaf condition node against the event.
 
-    Returns (matched, field_name, matched_value) so the caller can build
-    a human-readable explanation of what actually triggered the rule.
+    Returns (matched, field_name, matched_value, failure_reason) for the
+    caller to build a human-readable explanation of both why the rule fired
+    and why it failed.
     """
     value = node.value
 
@@ -67,12 +86,19 @@ def _leaf_matches(node, event: dict) -> tuple[bool, str | None, str | None]:
         pattern = str(value)
         for k, v in event.items():
             if v is not None and fnmatch.fnmatch(str(v).lower(), pattern.lower()):
-                return True, k, str(v)
-        return False, None, None
+                return True, k, str(v), None
+        return False, "<any>", None, _make_failure_reason(
+            "<any>", "value_mismatch", pattern, None
+        )
 
     field_name = node.field
     if field_name not in event:
-        return False, None, None
+        return (
+            False,
+            field_name,
+            None,
+            _make_failure_reason(field_name, "field_missing", str(value), None),
+        )
     event_value = event[field_name]
 
     if isinstance(value, SigmaNumber):
@@ -80,48 +106,79 @@ def _leaf_matches(node, event: dict) -> tuple[bool, str | None, str | None]:
             matched = int(event_value) == value.number
         except (TypeError, ValueError):
             matched = str(event_value) == str(value.number)
-        return (matched, field_name, str(event_value)) if matched else (False, None, None)
+        if matched:
+            return True, field_name, str(event_value), None
+        return (
+            False,
+            field_name,
+            None,
+            _make_failure_reason(field_name, "value_mismatch", str(value.number), str(event_value)),
+        )
 
     if isinstance(value, SigmaString):
         pattern = str(value)  # pySigma already renders contains/endswith/
         # startswith modifiers as a glob pattern with '*' wildcards here.
         matched = fnmatch.fnmatch(str(event_value).lower(), pattern.lower())
-        return (matched, field_name, str(event_value)) if matched else (False, None, None)
+        if matched:
+            return True, field_name, str(event_value), None
+        return (
+            False,
+            field_name,
+            None,
+            _make_failure_reason(field_name, "value_mismatch", pattern, str(event_value)),
+        )
 
     # Fallback: plain equality
     matched = str(event_value).lower() == str(value).lower()
-    return (matched, field_name, str(event_value)) if matched else (False, None, None)
+    if matched:
+        return True, field_name, str(event_value), None
+    return (
+        False,
+        field_name,
+        None,
+        _make_failure_reason(field_name, "value_mismatch", str(value), str(event_value)),
+    )
 
 
-def _eval_node(node, event: dict) -> tuple[bool, list[tuple[str, str]]]:
-    """Evaluate a condition node, returning (matched, evidence).
+def _eval_node(
+    node,
+    event: dict,
+) -> tuple[bool, list[tuple[str, str]], list[FailureReason]]:
+    """Evaluate a condition node, returning (matched, evidence, failure_reasons).
 
     `evidence` is the list of (field, value) leaves that made the match
     true — every satisfied leaf under an AND, or the satisfied branch's
     leaves under an OR.
+
+    `failure_reasons` is populated only when the node does not match. For an
+    AND the first failing leaf's reason is returned; for an OR all failing
+    leaf reasons are returned.
     """
     if isinstance(node, ConditionAND):
         results = [_eval_node(child, event) for child in node.args]
-        if not all(ok for ok, _ in results):
-            return False, []
-        evidence = [pair for _, pairs in results for pair in pairs]
-        return True, evidence
+        for ok, _, reasons in results:
+            if not ok:
+                return False, [], reasons[:1] if reasons else []
+        evidence = [pair for _, pairs, _ in results for pair in pairs]
+        return True, evidence, []
     if isinstance(node, ConditionOR):
+        failure_reasons: list[FailureReason] = []
         for child in node.args:
-            ok, evidence = _eval_node(child, event)
+            ok, evidence, reasons = _eval_node(child, event)
             if ok:
-                return True, evidence
-        return False, []
+                return True, evidence, []
+            failure_reasons.extend(reasons)
+        return False, [], failure_reasons
     if isinstance(node, ConditionNOT):
-        ok, _ = _eval_node(node.args[0], event)
+        ok, _, _ = _eval_node(node.args[0], event)
         # A negated condition being satisfied doesn't itself point to a
         # specific field/value that "caused" the match.
-        return (not ok), []
+        return (not ok), [], []
     if isinstance(node, (ConditionFieldEqualsValueExpression, ConditionValueExpression)):
-        ok, field_name, matched_value = _leaf_matches(node, event)
+        ok, field_name, matched_value, failure_reason = _leaf_matches(node, event)
         if ok and field_name is not None:
-            return True, [(field_name, matched_value)]
-        return ok, []
+            return True, [(field_name, matched_value)], []
+        return False, [], [failure_reason] if failure_reason else []
     raise TypeError(f"Unsupported condition node type: {type(node)}")
 
 
@@ -136,8 +193,9 @@ class RuleMatcher:
         self._trees = [c.parsed for c in rule.detection.parsed_condition]
 
     def match(self, event: dict) -> MatchResult:
+        failure_reasons: list[FailureReason] = []
         for tree in self._trees:
-            matched, evidence = _eval_node(tree, event)
+            matched, evidence, reasons = _eval_node(tree, event)
             if matched:
                 first_field, first_value = evidence[0] if evidence else (None, None)
                 return MatchResult(
@@ -146,7 +204,10 @@ class RuleMatcher:
                     matched_field=first_field,
                     matched_value=first_value,
                 )
-        return MatchResult(matched=False)
+            failure_reasons.extend(reasons)
+        return MatchResult(matched=False, failure_reasons=failure_reasons)
 
     def evaluate_batch(self, events: list[dict]) -> list[tuple[dict, MatchResult]]:
         return [(e, self.match(e)) for e in events]
+
+
