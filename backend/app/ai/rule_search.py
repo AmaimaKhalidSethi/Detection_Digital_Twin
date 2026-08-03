@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.mitre.data import get_technique
-from app.models.db import DetectionRule, RuleVersion
+from app.models.db import DetectionRule, RuleVersion, RuleTechniqueMap
 
 
 def ensure_rule_search_fts(db: Session) -> None:
@@ -38,6 +38,7 @@ def ensure_rule_search_fts(db: Session) -> None:
 
 def rebuild_rule_search_index(db: Session) -> None:
     """Populate the search table from the current rules."""
+    ensure_rule_search_fts(db)
     db.execute(text("DELETE FROM rule_search"))
     rows = (
         db.query(DetectionRule.id, RuleVersion.id.label("version_id"), RuleVersion.yaml_content)
@@ -95,6 +96,7 @@ def search_rules(db: Session, query: str, tactic: Optional[str] = None, platform
         latest = rule.latest_version
         if latest is None:
             continue
+        mitre_techniques = sorted({mapping.technique_id for mapping in latest.technique_mappings})
         if tactic:
             # Technique IDs on the rule (e.g. "T1003.001") each map to a
             # MITRE tactic (e.g. "Credential Access") via the local
@@ -123,6 +125,7 @@ def search_rules(db: Session, query: str, tactic: Optional[str] = None, platform
                 "platform": row.platform or None,
                 "status": rule.status,
                 "version_number": latest.version_number,
+                "mitre_techniques": mitre_techniques,
             }
         )
     return results

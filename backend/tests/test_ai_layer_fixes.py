@@ -123,6 +123,42 @@ def test_tactic_filter_matches_by_tactic_name_not_technique_id(tmp_path):
         assert search_rules(db, "", tactic="persistence") == []
 
 
+def test_search_endpoint_includes_mitre_techniques_from_rule_maps():
+    client = TestClient(app)
+
+    upload = client.post("/rules", json={"yaml_content": WINDOWS_RULE})
+    assert upload.status_code == 200
+
+    search_response = client.get("/rules/search?q=powershell")
+    assert search_response.status_code == 200
+
+    payload = search_response.json()
+    assert payload, "expected at least one search result"
+    result = payload[0]
+    assert "mitre_techniques" in result
+    assert result["mitre_techniques"] == ["T1003.001", "T1059.001"]
+
+
+def test_search_index_rebuilds_after_later_rule_upload():
+    client = TestClient(app)
+
+    first_upload = client.post("/rules", json={"yaml_content": WINDOWS_RULE})
+    assert first_upload.status_code == 200
+
+    initial_search = client.get("/rules/search?q=lsass")
+    assert initial_search.status_code == 200
+    assert initial_search.json(), "first rule should be searchable immediately"
+
+    second_upload = client.post("/rules", json={"yaml_content": LINUX_RULE})
+    assert second_upload.status_code == 200
+
+    followup_search = client.get("/rules/search?q=cron")
+    assert followup_search.status_code == 200
+    payload = followup_search.json()
+    assert payload, "second rule should become searchable after a later upload"
+    assert any(item["title"] == "Suspicious Cron Job Creation" for item in payload)
+
+
 # -------------------------------------------------------- match explanation
 
 def test_explanation_names_the_actual_matched_fields():

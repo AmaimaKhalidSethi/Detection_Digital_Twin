@@ -18,7 +18,7 @@ from app.detection_engine.evaluator import (
     evaluate_rule_versions_against_events,
 )
 from app.detection_engine.analysis import build_coverage_report, build_drift_report
-from app.ai.rule_search import search_rules, _extract_yaml_scalar
+from app.ai.rule_search import rebuild_rule_search_index, search_rules, _extract_yaml_scalar
 from app.ai.technique_suggester import confirm_ai_suggestions, suggest_rule_techniques
 from app.ai.alert_explainer import explain_match
 from app.technique_maps import upsert_rule_technique_map
@@ -229,6 +229,7 @@ def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
             )
         )
     db.commit()
+    rebuild_rule_search_index(db)
     return {
         "rule_id": rule.id,
         "version_id": version.id,
@@ -266,6 +267,7 @@ def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(
             )
         )
     db.commit()
+    rebuild_rule_search_index(db)
     return {"rule_id": rule.id, "version_id": version.id, "version_number": next_version_number}
 
 
@@ -323,6 +325,7 @@ def delete_rule(rule_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Rule not found")
     db.delete(rule)
     db.commit()
+    rebuild_rule_search_index(db)
     return {"deleted": rule_id}
 
 
