@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 from typing import Protocol
@@ -13,6 +14,29 @@ from app.detection_engine.evaluator import evaluate_rule_version_against_events
 from app.models.db import RuleTechniqueMap, RuleVersion
 from app.telemetry.generators.synthetic_log_generator import run_simulation
 from app.technique_maps import upsert_rule_technique_map
+
+logger = logging.getLogger(__name__)
+
+# Provider request/response wiring for each supported free-tier-friendly
+# backend. Model IDs are the single most perishable part of this module —
+# providers retire chat models on a matter of months, and a stale ID turns
+# into a hard failure (404/400) rather than a degraded response. Verified
+# current as of 2026-08:
+#   - groq: llama-3.1-8b-instant was deprecated 2026-06-17 and is being
+#     shut down 2026-08-16; openai/gpt-oss-20b is Groq's own recommended
+#     replacement (console.groq.com/docs/deprecations).
+#   - gemini: gemini-2.0-flash was fully shut down 2026-06-01; the
+#     supported replacement is gemini-2.5-flash.
+#   - openai: gpt-4o-mini's 4o-family is being wound down in favor of the
+#     GPT-5 line; gpt-5-mini is the current cost-efficient, actively
+#     supported model on the Responses API.
+# If a provider retires its model again, only the constants below need to
+# change.
+_GROQ_MODEL = "openai/gpt-oss-20b"
+_GEMINI_MODEL = "gemini-2.5-flash"
+_OPENAI_MODEL = "gpt-5-mini"
+
+_REQUEST_TIMEOUT_SECONDS = 20
 
 
 class LLMClient(Protocol):
@@ -37,39 +61,88 @@ class _HttpClient:
         self.api_key = api_key
 
     def suggest_techniques(self, rule_text: str) -> list[str]:
+        """Ask the configured provider for ATT&CK technique IDs.
+
+        Never raises: any network failure, non-2xx response, or
+        unexpected response shape is logged and treated as "no
+        suggestions" so a flaky or misconfigured LLM provider degrades
+        the /suggest-techniques endpoint instead of taking it down with
+        a 500.
+        """
         import requests
+
+        prompt = (
+            "Return only ATT&CK technique IDs like T1059.001, T1003.001, "
+            f"or a JSON array of them for this rule: {rule_text}"
+        )
 
         if self.provider == "groq":
             endpoint = "https://api.groq.com/openai/v1/chat/completions"
             payload = {
-                "model": "llama-3.1-8b-instant",
-                "messages": [{"role": "user", "content": f"Return only ATT&CK technique IDs like T1059.001, T1003.001, or a JSON array of them for this rule: {rule_text}"}],
+                "model": _GROQ_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1,
             }
             headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         elif self.provider == "gemini":
-            endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-            payload = {"contents": [{"parts": [{"text": f"Return only ATT&CK technique IDs like T1059.001, T1003.001, or a JSON array of them for this rule: {rule_text}"}]}]}
+            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{_GEMINI_MODEL}:generateContent"
+            payload = {"contents": [{"parts": [{"text": prompt}]}]}
             headers = {"x-goog-api-key": self.api_key}
         else:
             endpoint = "https://api.openai.com/v1/responses"
-            payload = {"model": "gpt-4o-mini", "input": f"Return only ATT&CK technique IDs like T1059.001, T1003.001, or a JSON array of them for this rule: {rule_text}"}
+            payload = {"model": _OPENAI_MODEL, "input": prompt}
             headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
 
-        response = requests.post(endpoint, json=payload, headers=headers, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+        try:
+            response = requests.post(endpoint, json=payload, headers=headers, timeout=_REQUEST_TIMEOUT_SECONDS)
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.RequestException as exc:
+            logger.warning("LLM technique-suggestion request to %s failed: %s", self.provider, exc)
+            return []
+        except ValueError as exc:  # response body wasn't valid JSON
+            logger.warning("LLM technique-suggestion response from %s was not valid JSON: %s", self.provider, exc)
+            return []
 
-        if self.provider == "gemini":
-            text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-        elif self.provider == "groq":
-            text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-        else:
-            text = data.get("output", [{}])[0].get("content", [{}])[0].get("text", "") if isinstance(data.get("output"), list) else ""
+        try:
+            text = self._extract_text(data)
+        except (AttributeError, IndexError, KeyError, TypeError) as exc:
+            logger.warning("LLM technique-suggestion response from %s had an unexpected shape: %s", self.provider, exc)
+            return []
 
-        if not isinstance(text, str):
+        if not isinstance(text, str) or not text:
             return []
         return re.findall(r"T[0-9]{4}(?:\.[0-9]{3})?", text)
+
+    def _extract_text(self, data: dict) -> str:
+        if self.provider == "gemini":
+            candidates = data.get("candidates") or []
+            if not candidates:
+                return ""
+            parts = candidates[0].get("content", {}).get("parts") or []
+            return parts[0].get("text", "") if parts else ""
+
+        if self.provider == "groq":
+            choices = data.get("choices") or []
+            if not choices:
+                return ""
+            return choices[0].get("message", {}).get("content", "")
+
+        # OpenAI Responses API: the `output` array can contain reasoning,
+        # tool-call, and message items in any order, so the assistant's
+        # text is not reliably at output[0].content[0].text. Scan for the
+        # message item(s) instead, per OpenAI's own guidance
+        # (platform.openai.com/docs/guides/text).
+        output = data.get("output") or []
+        for item in output:
+            if not isinstance(item, dict) or item.get("type") != "message":
+                continue
+            for block in item.get("content") or []:
+                if isinstance(block, dict) and block.get("type") == "output_text":
+                    text = block.get("text", "")
+                    if text:
+                        return text
+        return ""
 
 
 def get_llm_client() -> LLMClient | None:
