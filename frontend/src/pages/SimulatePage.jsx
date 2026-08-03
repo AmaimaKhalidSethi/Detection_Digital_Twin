@@ -44,6 +44,27 @@ export default function SimulatePage() {
   };
 
   const meta = techniqueMeta[selectedTechnique];
+  const unmatchedRules = evalResult?.results?.filter((rule) => !rule.matched) ?? [];
+  const renderFailureReason = (rule) => {
+    if (rule.parse_error) {
+      return `Rule failed to parse: ${rule.parse_error}`;
+    }
+
+    const failure = rule.failure_reasons?.[0];
+    if (!failure) {
+      return "Rule did not match this event.";
+    }
+
+    if (failure.type === "field_missing") {
+      return `field '${failure.field}' was not present in this event`;
+    }
+
+    if (failure.type === "value_mismatch") {
+      return `field '${failure.field}' was '${failure.actual}', rule expected '${failure.expected}'`;
+    }
+
+    return "Rule did not match this event.";
+  };
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
@@ -125,6 +146,31 @@ export default function SimulatePage() {
                 <p className="mt-1 font-mono text-[11px] text-graphite-400">
                   {evalResult.rules_evaluated} active rule(s) evaluated against this run.
                 </p>
+                <details className="mt-4 rounded-md border border-graphite-700 bg-graphite-950 text-sm text-graphite-200">
+                  <summary className="cursor-pointer px-3 py-2 font-medium text-graphite-100 outline-none focus:outline-none">
+                    Show why
+                  </summary>
+                  <div className="space-y-3 border-t border-graphite-700 px-3 py-3">
+                    {unmatchedRules.length === 0 ? (
+                      <div className="rounded-md bg-graphite-900 p-3 text-graphite-300">
+                        All evaluated rules matched.
+                      </div>
+                    ) : (
+                      unmatchedRules.map((rule) => (
+                        <div key={rule.rule_version_id} className="rounded-md border border-graphite-700 bg-graphite-900 p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge tone="amber">{rule.rule_version_id}</Badge>
+                            <span
+                              className={`text-xs font-mono ${rule.parse_error ? "text-rose-300" : "text-graphite-200"}`}
+                            >
+                              {renderFailureReason(rule)}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </details>
               </div>
             )}
           </div>
