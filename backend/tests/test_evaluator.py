@@ -1,5 +1,3 @@
-from sigma.rule import SigmaRule
-
 from app.detection_engine.evaluator import evaluate_rule_version_against_events
 
 
