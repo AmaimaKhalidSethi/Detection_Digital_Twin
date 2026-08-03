@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, GitCommitHorizontal } from "lucide-react";
+import { Download } from "lucide-react";
 import { api } from "../lib/api";
 import { Panel, Badge, Button, EmptyState } from "../components/ui";
 
@@ -27,13 +27,11 @@ function CoverageCell({ row }) {
 
 export default function CoveragePage() {
   const [coverage, setCoverage] = useState([]);
-  const [drift, setDrift] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.coverage(), api.drift()]).then(([c, d]) => {
+    api.coverage().then((c) => {
       setCoverage(c);
-      setDrift(d);
       setLoading(false);
     });
   }, []);
@@ -99,30 +97,6 @@ export default function CoveragePage() {
         )}
       </Panel>
 
-      <Panel title="Drift report" eyebrow="Drift detection">
-        {drift.length === 0 ? (
-          <EmptyState
-            title="No drift detected"
-            hint="Re-run a simulation after editing a rule to check for regressions."
-          />
-        ) : (
-          <ul className="divide-y divide-graphite-700">
-            {drift.map((d) => (
-              <li key={d.rule_version_id} className="flex items-center gap-3 py-3">
-                <GitCommitHorizontal size={16} className="text-amber-400" />
-                <div>
-                  <div className="text-sm text-graphite-100">{d.rule_title}</div>
-                  <div className="font-mono text-[11px] text-graphite-500">
-                    was {d.previous_result ? "firing" : "not firing"}, now{" "}
-                    {d.current_result ? "firing" : "not firing"}
-                  </div>
-                </div>
-                <Badge tone="amber">changed</Badge>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
     </div>
   );
 }
