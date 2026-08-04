@@ -19,7 +19,7 @@ from app.ai.alert_explainer import explain_match
 from app.ai.rule_search import search_rules
 from app.ai.technique_suggester import _HttpClient
 from app.detection_engine.matcher import RuleMatcher
-from app.main import app
+from app.main import app, list_rules
 from app.models.db import Base, DetectionRule, RuleVersion, make_engine, make_session_factory
 
 
@@ -100,6 +100,30 @@ def test_no_platform_filter_returns_everything(tmp_path):
         db.commit()
 
         assert len(search_rules(db, "")) == 2
+
+
+def test_archived_rules_are_hidden_by_default_and_available_when_requested(tmp_path):
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as db:
+        active_rule = DetectionRule(title="tmp", status="active")
+        archived_rule = DetectionRule(title="tmp", status="archived")
+        db.add_all([active_rule, archived_rule])
+        db.flush()
+        db.add(RuleVersion(rule_id=active_rule.id, version_number=1, yaml_content=WINDOWS_RULE, mitre_techniques=[]))
+        db.add(RuleVersion(rule_id=archived_rule.id, version_number=1, yaml_content=LINUX_RULE, mitre_techniques=[]))
+        db.commit()
+
+        default_search = search_rules(db, "")
+        assert {rule["rule_id"] for rule in default_search} == {active_rule.id}
+
+        archived_search = search_rules(db, "", status="archived")
+        assert {rule["rule_id"] for rule in archived_search} == {archived_rule.id}
+
+        default_list = list_rules(db)
+        assert {rule["rule_id"] for rule in default_list} == {active_rule.id}
+
+        archived_list = list_rules(db, status="archived")
+        assert {rule["rule_id"] for rule in archived_list} == {archived_rule.id}
 
 
 # ----------------------------------------------------------------- tactic --

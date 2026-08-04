@@ -199,6 +199,17 @@ def list_simulation_coverage_gaps():
 
 # --------------------------------------------------------- Rules (FR-01..03)
 
+@app.post("/rules/validate")
+def validate_rule(payload: RuleUploadRequest):
+    result = validate_rule_yaml(payload.yaml_content)
+    return {
+        "valid": result.valid,
+        "errors": result.errors,
+        "mitre_techniques": result.mitre_techniques or [],
+        "title": getattr(result.rule, "title", None) if result.rule else None,
+    }
+
+
 @app.post("/rules")
 def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
     result = validate_rule_yaml(payload.yaml_content)
@@ -271,8 +282,16 @@ def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(
 
 
 @app.get("/rules")
-def list_rules(db: Session = Depends(get_db)):
-    rules = db.query(DetectionRule).all()
+def list_rules(db: Session = Depends(get_db), status: str | None = None):
+    query = db.query(DetectionRule)
+    if status is None:
+        query = query.filter(DetectionRule.status != "archived")
+    elif status.lower() == "archived":
+        query = query.filter(DetectionRule.status == "archived")
+    else:
+        query = query.filter(DetectionRule.status == status)
+
+    rules = query.all()
     out = []
     for r in rules:
         lv = r.latest_version
@@ -317,12 +336,13 @@ def get_rule(rule_id: str, db: Session = Depends(get_db)):
     }
 
 
+# Archive a rule (soft delete - preserves version history for drift reporting)
 @app.delete("/rules/{rule_id}")
 def delete_rule(rule_id: str, db: Session = Depends(get_db)):
     rule = db.get(DetectionRule, rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
-    db.delete(rule)
+    rule.status = "archived"
     db.commit()
     rebuild_rule_search_index(db)
     return {"deleted": rule_id}

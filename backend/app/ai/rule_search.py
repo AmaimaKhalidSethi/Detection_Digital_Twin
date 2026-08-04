@@ -114,7 +114,13 @@ def search_rules(db: Session, query: str, tactic: Optional[str] = None, platform
             # query param, which is what this used to (incorrectly) do.
             if (row.platform or "").lower() != platform.lower():
                 continue
-        if status and status.lower() != rule.status.lower():
+        if status is None:
+            if rule.status.lower() == "archived":
+                continue
+        elif status.lower() == "archived":
+            if rule.status.lower() != "archived":
+                continue
+        elif status.lower() != rule.status.lower():
             continue
         results.append(
             {

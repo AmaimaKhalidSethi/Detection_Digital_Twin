@@ -101,6 +101,22 @@ def test_malformed_rule_rejected(client):
     assert "errors" in r.json()["detail"]
 
 
+def test_validate_endpoint_reports_state_without_persisting_rule(client):
+    response = client.post(
+        "/rules/validate",
+        json={"yaml_content": "title: broken\ndetection:\n  condition: missing_selector"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "valid": False,
+        "errors": ["Sigma validation error: Sigma rule must have a log source"],
+        "mitre_techniques": [],
+        "title": None,
+    }
+    assert client.get("/rules").json() == []
+
+
 def test_oversized_rule_rejected(client):
     huge_yaml = "title: x\n" + ("a" * 300_000)
     r = client.post("/rules", json={"yaml_content": huge_yaml})
