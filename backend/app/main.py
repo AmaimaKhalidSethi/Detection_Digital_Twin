@@ -27,7 +27,7 @@ from app.telemetry.generators.synthetic_log_generator import (
     run_simulation,
     simulation_coverage_gaps,
 )
-from app.mitre.data import all_techniques
+from app.mitre.attack_data_loader import all_techniques
 
 engine = make_engine()
 SessionLocal = make_session_factory(engine)
@@ -99,7 +99,6 @@ def _candidate_techniques_for_rule_version(rule_version: RuleVersion, technique_
             if technique_meta[technique_id].get("tactic") != tactic_name:
                 continue
             techniques_to_test.add(technique_id)
-            break
     return sorted(techniques_to_test)
 
 

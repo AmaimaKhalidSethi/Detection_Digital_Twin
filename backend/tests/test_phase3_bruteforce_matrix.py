@@ -34,6 +34,22 @@ def _upload_rule(client, title, technique_id, detection_text):
     return response.json(), yaml
 
 
+def test_candidate_techniques_for_rule_version_adds_all_sibling_techniques_for_declared_tactic():
+    rule_version = SimpleNamespace(
+        technique_mappings=[SimpleNamespace(technique_id="T1059.001", source="declared_tag")]
+    )
+    technique_meta = {
+        "T1059.001": {"tactic": "execution"},
+        "T1059.002": {"tactic": "execution"},
+        "T1059.003": {"tactic": "execution"},
+        "T1027": {"tactic": "defense_evasion"},
+    }
+
+    candidates = _candidate_techniques_for_rule_version(rule_version, technique_meta)
+
+    assert candidates == ["T1059.001", "T1059.002", "T1059.003"]
+
+
 def test_full_matrix_job_writes_expected_bruteforce_rows_and_unexpected_matches(monkeypatch):
     client = TestClient(app)
     monkeypatch.setattr(
