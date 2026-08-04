@@ -14,3 +14,4 @@ PyYAML==6.0.3
 SQLAlchemy==2.0.51
 types-PyYAML==6.0.12.20260724
 uvicorn==0.52.0
+mitreattack-python==6.1.0
