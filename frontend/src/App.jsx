@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { FileCode2, PlayCircle, Bell, Grid3x3, Radar, GitCommitHorizontal } from "lucide-react";
-import RulesPage from "./pages/RulesPage";
+import { FileCode2, PlayCircle, Bell, FlaskConical, Grid3x3, Radar, GitCommitHorizontal } from "lucide-react";
+import RulesLibraryPage from "./pages/RulesLibraryPage";
+import RuleTestingPage from "./pages/RuleTestingPage";
 import SimulatePage from "./pages/SimulatePage";
 import AlertsPage from "./pages/AlertsPage";
 import CoveragePage from "./pages/CoveragePage";
 import DriftPage from "./pages/DriftPage";
 
 const TABS = [
-  { id: "rules", label: "Rules", icon: FileCode2, component: RulesPage },
+  { id: "library", label: "Rule Library", icon: FileCode2, component: RulesLibraryPage },
+  { id: "testing", label: "Rule Testing", icon: FlaskConical, component: RuleTestingPage },
   { id: "simulate", label: "Simulate", icon: PlayCircle, component: SimulatePage },
   { id: "alerts", label: "Alerts", icon: Bell, component: AlertsPage },
   { id: "coverage", label: "Coverage", icon: Grid3x3, component: CoveragePage },
@@ -15,7 +17,7 @@ const TABS = [
 ];
 
 export default function App() {
-  const [active, setActive] = useState("rules");
+  const [active, setActive] = useState("library");
   const ActiveComponent = TABS.find((t) => t.id === active).component;
 
   return (
