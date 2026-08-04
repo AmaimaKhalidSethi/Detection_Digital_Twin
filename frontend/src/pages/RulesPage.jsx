@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, FileUp, PlayCircle, Search, ShieldCheck, Spa
 import { api } from "../lib/api";
 import { Panel, Badge, Button, EmptyState, ErrorNote } from "../components/ui";
 
-const PLACEHOLDER_YAML = `title: My detection rule
+export const PLACEHOLDER_YAML = `title: My detection rule
 status: test
 description: What this rule detects
 logsource:

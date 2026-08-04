@@ -31,6 +31,8 @@ export const api = {
   getRule: (ruleId) => request(`/rules/${ruleId}`),
   uploadRule: (yamlContent) =>
     request("/rules", { method: "POST", body: JSON.stringify({ yaml_content: yamlContent }) }),
+  validateRule: (yamlContent) =>
+    request("/rules/validate", { method: "POST", body: JSON.stringify({ yaml_content: yamlContent }) }),
   updateRule: (ruleId, yamlContent) =>
     request(`/rules/${ruleId}`, { method: "PUT", body: JSON.stringify({ yaml_content: yamlContent }) }),
   deleteRule: (ruleId) => request(`/rules/${ruleId}`, { method: "DELETE" }),
