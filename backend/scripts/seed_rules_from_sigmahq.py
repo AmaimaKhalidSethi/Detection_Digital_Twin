@@ -87,6 +87,7 @@ def seed_sigmahq_rules(
             mitre_techniques=result.mitre_techniques or [],
             author=getattr(result.rule, "author", None),
             license=SIGMAHQ_LICENSE,
+            source="sigma_import",
         )
         db.add(version)
         db.flush()

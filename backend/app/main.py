@@ -226,6 +226,7 @@ def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
         mitre_techniques=result.mitre_techniques or [],
         author=getattr(result.rule, "author", None),
         license=getattr(result.rule, "license", None),
+        source="manual",
     )
     db.add(version)
     db.flush()
@@ -245,6 +246,7 @@ def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
         "version_id": version.id,
         "title": rule.title,
         "mitre_techniques": result.mitre_techniques,
+        "source": version.source,
     }
 
 
@@ -264,6 +266,7 @@ def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(
         mitre_techniques=result.mitre_techniques or [],
         author=getattr(result.rule, "author", None),
         license=getattr(result.rule, "license", None),
+        source="manual",
     )
     db.add(version)
     db.flush()
@@ -278,7 +281,12 @@ def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(
         )
     db.commit()
     rebuild_rule_search_index(db)
-    return {"rule_id": rule.id, "version_id": version.id, "version_number": next_version_number}
+    return {
+        "rule_id": rule.id,
+        "version_id": version.id,
+        "version_number": next_version_number,
+        "source": version.source,
+    }
 
 
 @app.get("/rules")
@@ -307,6 +315,7 @@ def list_rules(db: Session = Depends(get_db), status: str | None = None):
                 "version_id": lv.id if lv else None,
                 "author": lv.author if lv else None,
                 "mitre_techniques": sorted({m.technique_id for m in lv.technique_mappings}) if lv else [],
+                "source": lv.source if lv else None,
             }
         )
     return out
@@ -328,8 +337,9 @@ def get_rule(rule_id: str, db: Session = Depends(get_db)):
         "status": rule.status,
         "versions": [
             {"version_id": v.id, "version_number": v.version_number, "yaml_content": v.yaml_content,
-             "mitre_techniques": sorted({m.technique_id for m in v.technique_mappings}),
-             "author": v.author,
+              "mitre_techniques": sorted({m.technique_id for m in v.technique_mappings}),
+              "source": v.source,
+              "author": v.author,
              "created_at": v.created_at.isoformat()}
             for v in sorted(rule.versions, key=lambda v: v.version_number)
         ],

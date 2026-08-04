@@ -54,6 +54,7 @@ class RuleVersion(Base):
     mitre_techniques = Column(JSON, default=list)
     author = Column(String(255), nullable=True)
     license = Column(String(64), nullable=True)
+    source = Column(String(32), default="manual", nullable=False)
     created_at = Column(DateTime, default=_now)
     rule = relationship("DetectionRule", back_populates="versions")
     technique_mappings = relationship(
@@ -187,3 +188,5 @@ def init_db(engine):
             connection.execute(text("ALTER TABLE rule_versions ADD COLUMN author VARCHAR(255)"))
         if "license" not in columns:
             connection.execute(text("ALTER TABLE rule_versions ADD COLUMN license VARCHAR(64)"))
+        if "source" not in columns:
+            connection.execute(text("ALTER TABLE rule_versions ADD COLUMN source VARCHAR(32) DEFAULT 'manual'"))
