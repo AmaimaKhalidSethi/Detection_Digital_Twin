@@ -131,9 +131,8 @@ class WazuhClient:
 
             for rule in affected_items:
                 mitre = rule.get("mitre") if isinstance(rule, dict) else None
-                ids = mitre.get("id") if isinstance(mitre, dict) else None
-                if isinstance(ids, list):
-                    technique_ids.update(technique_id for technique_id in ids if isinstance(technique_id, str))
+                if isinstance(mitre, list):
+                    technique_ids.update(technique_id for technique_id in mitre if isinstance(technique_id, str))
 
             offset += limit
 
