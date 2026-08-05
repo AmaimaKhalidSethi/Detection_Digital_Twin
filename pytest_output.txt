@@ -1,0 +1,5 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.6, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\HP\Downloads\detection-digital-twin\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\HP\Downloads\detection-digital-twin
+plugins: anyio-4.14.2

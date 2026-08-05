@@ -1,0 +1,69 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.6, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\HP\Downloads\detection-digital-twin\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\HP\Downloads\detection-digital-twin\backend
+configfile: pytest.ini
+plugins: anyio-4.14.2
+collecting ... collected 53 items
+
+tests/test_ai_layer_fixes.py::test_platform_filter_actually_filters_by_rule_platform PASSED [  1%]
+tests/test_ai_layer_fixes.py::test_no_platform_filter_returns_everything PASSED [  3%]
+tests/test_ai_layer_fixes.py::test_archived_rules_are_hidden_by_default_and_available_when_requested PASSED [  5%]
+tests/test_ai_layer_fixes.py::test_tactic_filter_matches_by_tactic_name_not_technique_id PASSED [  7%]
+tests/test_ai_layer_fixes.py::test_search_endpoint_includes_mitre_techniques_from_rule_maps PASSED [  9%]
+tests/test_ai_layer_fixes.py::test_search_index_rebuilds_after_later_rule_upload PASSED [ 11%]
+tests/test_ai_layer_fixes.py::test_explanation_names_the_actual_matched_fields PASSED [ 13%]
+tests/test_ai_layer_fixes.py::test_explanation_reports_no_match_without_dumping_huge_payload PASSED [ 15%]
+tests/test_ai_layer_fixes.py::test_match_result_carries_evidence_for_or_condition PASSED [ 16%]
+tests/test_ai_layer_fixes.py::test_http_client_returns_empty_list_on_connection_error PASSED [ 18%]
+tests/test_ai_layer_fixes.py::test_http_client_returns_empty_list_on_http_error PASSED [ 20%]
+tests/test_ai_layer_fixes.py::test_http_client_returns_empty_list_on_malformed_json_body PASSED [ 22%]
+tests/test_ai_layer_fixes.py::test_http_client_extracts_text_from_openai_response_with_reasoning_item_first PASSED [ 24%]
+tests/test_ai_layer_fixes.py::test_suggest_techniques_endpoint_survives_configured_provider_outage PASSED [ 26%]
+tests/test_atomic_red_team_simulations.py::test_vendored_atomic_loader_supports_at_least_200_distinct_techniques PASSED [ 28%]
+tests/test_atomic_red_team_simulations.py::test_atomic_command_lines_match_reviewed_golden_file PASSED [ 30%]
+tests/test_atomic_red_team_simulations.py::test_default_arguments_are_substituted_using_atomic_placeholder_syntax PASSED [ 32%]
+tests/test_atomic_red_team_simulations.py::test_external_payload_dependencies_are_skipped PASSED [ 33%]
+tests/test_atomic_red_team_simulations.py::test_coverage_gaps_endpoint_reports_unrunnable_vendored_techniques PASSED [ 35%]
+tests/test_attack_data_loader.py::test_loader_returns_technique_metadata_with_description PASSED [ 37%]
+tests/test_attack_data_loader.py::test_all_techniques_returns_attck_ids PASSED [ 39%]
+tests/test_attack_data_loader.py::test_tactic_is_normalized_to_title_case_and_uses_first_phase PASSED [ 41%]
+tests/test_coverage_regression.py::test_declared_rule_without_evaluation_is_not_marked_as_passing PASSED [ 43%]
+tests/test_coverage_regression.py::test_evaluating_unrelated_technique_does_not_break_coverage PASSED [ 45%]
+tests/test_coverage_regression.py::test_evaluating_unrelated_technique_does_not_trigger_false_drift PASSED [ 47%]
+tests/test_coverage_regression.py::test_real_drift_is_detected_on_same_technique PASSED [ 49%]
+tests/test_evaluator.py::test_evaluate_rule_version_against_events_parse_error PASSED [ 50%]
+tests/test_evaluator.py::test_evaluate_rule_version_against_events_non_match_returns_failure_reasons PASSED [ 52%]
+tests/test_evaluator.py::test_evaluate_rule_version_against_events_first_non_matching_failure_reasons PASSED [ 54%]
+tests/test_integration_pipeline.py::test_real_sigmahq_rule_detects_simulated_technique PASSED [ 56%]
+tests/test_integration_pipeline.py::test_coverage_report_flags_uncovered_techniques PASSED [ 58%]
+tests/test_integration_pipeline.py::test_malformed_rule_rejected PASSED  [ 60%]
+tests/test_integration_pipeline.py::test_validate_endpoint_reports_state_without_persisting_rule PASSED [ 62%]
+tests/test_integration_pipeline.py::test_oversized_rule_rejected PASSED  [ 64%]
+tests/test_matcher.py::test_and_condition_true PASSED                    [ 66%]
+tests/test_matcher.py::test_and_condition_false_missing_field PASSED     [ 67%]
+tests/test_matcher.py::test_or_condition PASSED                          [ 69%]
+tests/test_matcher.py::test_not_condition PASSED                         [ 71%]
+tests/test_matcher.py::test_contains_is_case_insensitive PASSED          [ 73%]
+tests/test_matcher.py::test_numeric_field_match PASSED                   [ 75%]
+tests/test_matcher.py::test_and_condition_false_reports_first_failure_reason PASSED [ 77%]
+tests/test_matcher.py::test_or_condition_false_reports_all_failure_reasons PASSED [ 79%]
+tests/test_matcher.py::test_endswith_modifier PASSED                     [ 81%]
+tests/test_phase3_bruteforce_matrix.py::test_candidate_techniques_for_rule_version_adds_all_sibling_techniques_for_declared_tactic PASSED [ 83%]
+tests/test_phase3_bruteforce_matrix.py::test_full_matrix_job_writes_expected_bruteforce_rows_and_unexpected_matches PASSED [ 84%]
+tests/test_phase3_bruteforce_matrix.py::test_full_matrix_job_evaluates_outside_declared_tactic_and_records_match PASSED [ 86%]
+tests/test_phase3_bruteforce_matrix.py::test_rule_test_endpoint_reports_generic_exe_rule_as_unexpected_match_for_t1082 PASSED [ 88%]
+tests/test_phase4_ai_layer.py::test_rule_search_endpoint_returns_keyword_matches PASSED [ 90%]
+tests/test_phase4_ai_layer.py::test_get_llm_client_supports_free_groq_keys PASSED [ 92%]
+tests/test_phase4_ai_layer.py::test_ai_suggested_rows_do_not_count_toward_coverage PASSED [ 94%]
+tests/test_rule_technique_map_migration.py::test_backfill_creates_declared_mappings_and_is_idempotent PASSED [ 96%]
+tests/test_seed_import.py::test_seeded_sigmahq_rules_are_validated_mapped_and_matcher_safe PASSED [ 98%]
+tests/test_seed_import.py::test_alerts_include_the_rule_author PASSED    [100%]
+
+============================== warnings summary ===============================
+..\.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\HP\Downloads\detection-digital-twin\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 53 passed, 1 warning in 29.09s ========================
