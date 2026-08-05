@@ -12,6 +12,7 @@ from app.models.db import (
     DetectionRule, RuleVersion, RuleTechniqueMap, SimulationRun, GeneratedLog,
     DetectionResult, DriftRecord, Job,
 )
+from app.wazuh.client import WazuhClient
 from app.detection_engine.rule_manager import validate_rule_yaml
 from app.detection_engine.evaluator import (
     evaluate_rule_version_against_events,
@@ -640,6 +641,43 @@ def coverage_navigator_layer(db: Session = Depends(get_db)):
         "hideDisabled": False,
         "gradient": {"colors": ["#ffffff", "#35d488"], "minValue": 0, "maxValue": 100},
         "techniques": techniques,
+    }
+
+
+@app.get("/drift/production")
+def production_drift(db: Session = Depends(get_db)):
+    """
+    Compares the digital twin's verified technique coverage against the real
+    Wazuh production instance's actively enabled rules, to detect drift
+    between what the twin has confirmed and what production currently covers.
+    """
+    twin_report = coverage(db)
+    twin_verified = {row["technique_id"] for row in twin_report if row["rule_passes"]}
+
+    client = WazuhClient()
+    production_active = client.get_active_technique_ids()
+
+    if production_active is None:
+        return {
+            "wazuh_reachable": False,
+            "twin_verified_count": len(twin_verified),
+            "production_active_count": None,
+            "covered_both": [],
+            "twin_only": [],
+            "production_only": [],
+        }
+
+    covered_both = sorted(twin_verified & production_active)
+    twin_only = sorted(twin_verified - production_active)
+    production_only = sorted(production_active - twin_verified)
+
+    return {
+        "wazuh_reachable": True,
+        "twin_verified_count": len(twin_verified),
+        "production_active_count": len(production_active),
+        "covered_both": covered_both,
+        "twin_only": twin_only,
+        "production_only": production_only,
     }
 
 

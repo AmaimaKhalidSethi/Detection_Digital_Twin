@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 
 import requests
@@ -132,7 +133,10 @@ class WazuhClient:
             for rule in affected_items:
                 mitre = rule.get("mitre") if isinstance(rule, dict) else None
                 if isinstance(mitre, list):
-                    technique_ids.update(technique_id for technique_id in mitre if isinstance(technique_id, str))
+                    technique_ids.update(
+                        technique_id for technique_id in mitre
+                        if isinstance(technique_id, str) and re.fullmatch(r"T\d{4}(\.\d{3})?", technique_id)
+                    )
 
             offset += limit
 
