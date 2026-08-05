@@ -53,4 +53,6 @@ export const api = {
   coverage: () => request("/coverage"),
   navigatorLayer: () => request("/coverage/navigator-layer"),
   drift: () => request("/drift"),
+  productionDrift: () => request("/drift/production"),
+  productionDriftHistory: () => request("/drift/production/history"),
 };
