@@ -2,7 +2,21 @@ import { useEffect, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { api } from "../lib/api";
 import { Panel, Badge, Button, ErrorNote } from "../components/ui";
-import { PLACEHOLDER_YAML } from "./RulesPage";
+const PLACEHOLDER_YAML = `title: New detection rule
+id: 00000000-0000-0000-0000-000000000000
+status: test
+description: What this rule detects
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        Image|endswith: '\\example.exe'
+    condition: selection
+level: medium
+tags:
+    - attack.execution
+`;
 
 export default function RuleEditorPage({ ruleId = null, initialYaml = "", onSaved, onCancel }) {
   const [yamlText, setYamlText] = useState(initialYaml || PLACEHOLDER_YAML);
