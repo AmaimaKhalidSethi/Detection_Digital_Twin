@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.db import (
     make_engine, make_session_factory, init_db,
     DetectionRule, RuleVersion, RuleTechniqueMap, SimulationRun, GeneratedLog,
-    DetectionResult, DriftRecord, Job,
+    DetectionResult, DriftRecord, Job, ProductionDriftSnapshot,
 )
 from app.wazuh.client import WazuhClient
 from app.detection_engine.rule_manager import validate_rule_yaml
@@ -658,6 +658,16 @@ def production_drift(db: Session = Depends(get_db)):
     production_active = client.get_active_technique_ids()
 
     if production_active is None:
+        snapshot = ProductionDriftSnapshot(
+            wazuh_reachable=False,
+            twin_verified_count=len(twin_verified),
+            production_active_count=None,
+            covered_both=[],
+            twin_only=[],
+            production_only=[],
+        )
+        db.add(snapshot)
+        db.commit()
         return {
             "wazuh_reachable": False,
             "twin_verified_count": len(twin_verified),
@@ -671,6 +681,17 @@ def production_drift(db: Session = Depends(get_db)):
     twin_only = sorted(twin_verified - production_active)
     production_only = sorted(production_active - twin_verified)
 
+    snapshot = ProductionDriftSnapshot(
+        wazuh_reachable=True,
+        twin_verified_count=len(twin_verified),
+        production_active_count=len(production_active),
+        covered_both=covered_both,
+        twin_only=twin_only,
+        production_only=production_only,
+    )
+    db.add(snapshot)
+    db.commit()
+
     return {
         "wazuh_reachable": True,
         "twin_verified_count": len(twin_verified),
@@ -679,6 +700,28 @@ def production_drift(db: Session = Depends(get_db)):
         "twin_only": twin_only,
         "production_only": production_only,
     }
+
+
+@app.get("/drift/production/history")
+def production_drift_history(db: Session = Depends(get_db), limit: int = 30):
+    rows = (
+        db.query(ProductionDriftSnapshot)
+        .order_by(ProductionDriftSnapshot.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "created_at": row.created_at.isoformat(),
+            "wazuh_reachable": row.wazuh_reachable,
+            "twin_verified_count": row.twin_verified_count,
+            "production_active_count": row.production_active_count,
+            "covered_both_count": len(row.covered_both or []),
+            "twin_only_count": len(row.twin_only or []),
+            "production_only_count": len(row.production_only or []),
+        }
+        for row in rows
+    ]
 
 
 @app.get("/drift")

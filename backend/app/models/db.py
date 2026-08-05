@@ -122,6 +122,19 @@ class Job(Base):
     finished_at = Column(DateTime, nullable=True)
 
 
+class ProductionDriftSnapshot(Base):
+    __tablename__ = "production_drift_snapshots"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    wazuh_reachable = Column(Boolean, nullable=False)
+    twin_verified_count = Column(Integer, nullable=True)
+    production_active_count = Column(Integer, nullable=True)
+    covered_both = Column(JSON, default=list)
+    twin_only = Column(JSON, default=list)
+    production_only = Column(JSON, default=list)
+    created_at = Column(DateTime, default=_now, nullable=False)
+
+
 class SimulationRun(Base):
     __tablename__ = "simulation_runs"
     id = Column(String, primary_key=True, default=_uuid)
