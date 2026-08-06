@@ -10,6 +10,13 @@
   Red = active alert. Monospace is reserved for anything the analyst
   would actually copy-paste: rule titles, technique IDs, field names,
   command lines.
+ */
+/*
+  Redesign in progress (see frontend/DESIGN_SYSTEM.md).
+  New tokens (bg-950/900/800 above, plus Tailwind's built-in cyan-*, fuchsia-*, rose-*,
+  slate-* used directly in components) are being introduced alongside the existing
+  graphite/signal/amber tokens below. Do not delete the old tokens until
+  DESIGN_SYSTEM.md's migration checklist is fully checked off.
 */
 @theme {
   --color-graphite-950: #0a0f0d;
@@ -32,6 +39,9 @@
 
   --color-alert-500: #ef5757;
   --color-alert-400: #f47f7f;
+  --color-bg-950: #0a0e16;
+  --color-bg-900: #111a29;
+  --color-bg-800: #1a2740;
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
@@ -42,7 +52,7 @@ html, body, #root {
 }
 
 body {
-  background-color: var(--color-graphite-950);
+  background-color: var(--color-bg-950);
   color: var(--color-graphite-100);
   font-family: var(--font-sans);
 }
@@ -56,7 +66,7 @@ body {
 }
 
 ::selection {
-  background-color: var(--color-signal-600);
+  background-color: var(--color-cyan-500);
   color: var(--color-graphite-950);
 }
 
