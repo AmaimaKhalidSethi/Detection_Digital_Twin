@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { GitCommitHorizontal } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { api } from "../lib/api";
 import { Panel, Badge, Button, EmptyState, ErrorNote } from "../components/ui";
 
@@ -9,6 +10,7 @@ export default function DriftPage() {
   const [productionDrift, setProductionDrift] = useState(null);
   const [productionLoading, setProductionLoading] = useState(true);
   const [productionError, setProductionError] = useState("");
+  const [history, setHistory] = useState([]);
 
   useEffect(() => {
     api.drift().then((d) => {
@@ -22,6 +24,7 @@ export default function DriftPage() {
     setProductionError("");
     try {
       setProductionDrift(await api.productionDrift());
+      setHistory(await api.productionDriftHistory());
     } catch (error) {
       setProductionError(error.message);
     } finally {
@@ -37,20 +40,20 @@ export default function DriftPage() {
     <div className="space-y-6">
       <Panel title="Drift report" eyebrow="Drift detection">
         {loading ? (
-          <p className="text-sm text-graphite-400">Loading...</p>
+          <p className="text-sm text-slate-500">Loading...</p>
         ) : drift.length === 0 ? (
           <EmptyState
             title="No drift detected"
             hint="Re-run a simulation after editing a rule to check for regressions."
           />
         ) : (
-          <ul className="divide-y divide-graphite-700">
+          <ul className="divide-y divide-bg-800">
             {drift.map((d) => (
               <li key={d.rule_version_id} className="flex items-center gap-3 py-3">
-                <GitCommitHorizontal size={16} className="text-amber-400" />
+                <GitCommitHorizontal size={16} className="text-fuchsia-400" />
                 <div>
-                  <div className="text-sm text-graphite-100">{d.rule_title}</div>
-                  <div className="font-mono text-[11px] text-graphite-500">
+                  <div className="text-sm text-slate-300">{d.rule_title}</div>
+                  <div className="font-mono text-[11px] text-slate-500">
                     was {d.previous_result ? "firing" : "not firing"}, now{" "}
                     {d.current_result ? "firing" : "not firing"}
                   </div>
@@ -63,34 +66,36 @@ export default function DriftPage() {
       </Panel>
 
       <Panel title="Production comparison" eyebrow="Twin vs. real Wazuh">
-        {productionLoading ? (
-          <p className="text-sm text-graphite-400">Loading...</p>
-        ) : productionError ? (
-          <ErrorNote message={productionError} />
-        ) : !productionDrift?.wazuh_reachable ? (
-          <ErrorNote message="Wazuh manager unreachable — check WAZUH_BASE_URL and network connectivity." />
-        ) : (
-          <div className="space-y-4">
-            <Button variant="secondary" onClick={loadProductionDrift}>
-              Refresh comparison
-            </Button>
+        <div className="space-y-4">
+          <Button variant="secondary" onClick={loadProductionDrift}>
+            Refresh comparison
+          </Button>
 
+          {productionLoading ? (
+            <p className="text-sm text-slate-500">Loading...</p>
+          ) : productionError ? (
+            <ErrorNote message={productionError} />
+          ) : !productionDrift?.wazuh_reachable ? (
+            <ErrorNote message={"Wazuh manager unreachable \u2014 check WAZUH_BASE_URL and network connectivity."} />
+          ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {[
                 ["Twin verified", productionDrift.twin_verified_count],
                 ["Wazuh active", productionDrift.production_active_count],
                 ["Covered by both", productionDrift.covered_both.length],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-md border border-graphite-700 bg-graphite-900 p-3">
-                  <div className="font-mono text-[11px] uppercase tracking-widest text-graphite-500">{label}</div>
-                  <div className="mt-1 text-xl font-medium text-graphite-100">{value}</div>
+                <div key={label} className="rounded-md border border-bg-800 bg-bg-900 p-3">
+                  <div className="font-mono text-[11px] uppercase tracking-widest text-slate-500">{label}</div>
+                  <div className="mt-1 text-xl font-medium text-slate-300">{value}</div>
                 </div>
               ))}
             </div>
+          )}
 
+          {productionDrift?.wazuh_reachable && (
             <div className="space-y-2">
-              <details className="rounded-md border border-graphite-700 p-3">
-                <summary className="cursor-pointer text-sm text-graphite-100">
+              <details className="rounded-md border border-bg-800 p-3">
+                <summary className="cursor-pointer text-sm text-slate-300">
                   Blind spots in production (twin verified, Wazuh has no active rule)
                 </summary>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -100,8 +105,8 @@ export default function DriftPage() {
                 </div>
               </details>
 
-              <details className="rounded-md border border-graphite-700 p-3">
-                <summary className="cursor-pointer text-sm text-graphite-100">
+              <details className="rounded-md border border-bg-800 p-3">
+                <summary className="cursor-pointer text-sm text-slate-300">
                   Not yet verified by twin (active in Wazuh)
                 </summary>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -111,8 +116,35 @@ export default function DriftPage() {
                 </div>
               </details>
             </div>
-          </div>
-        )}
+          )}
+
+          {history.length > 0 && (
+            <div>
+              <div className="mb-2 font-mono text-[11px] uppercase tracking-widest text-slate-500">
+                Coverage over time
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={[...history].reverse()}>
+                  <CartesianGrid stroke="#1a2740" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="created_at"
+                    tickFormatter={(value) => new Date(value).toLocaleTimeString()}
+                    stroke="#64748b"
+                    fontSize={10}
+                  />
+                  <YAxis stroke="#64748b" fontSize={10} />
+                  <Tooltip
+                    contentStyle={{ background: "#111a29", border: "1px solid #1a2740", fontSize: 12 }}
+                    labelFormatter={(value) => new Date(value).toLocaleString()}
+                  />
+                  <Area type="monotone" dataKey="production_active_count" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.15} name="Wazuh active" />
+                  <Area type="monotone" dataKey="twin_verified_count" stroke="#e879f9" fill="#e879f9" fillOpacity={0.15} name="Twin verified" />
+                  <Area type="monotone" dataKey="covered_both_count" stroke="#a3e635" fill="#a3e635" fillOpacity={0.2} name="Covered by both" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
       </Panel>
     </div>
   );

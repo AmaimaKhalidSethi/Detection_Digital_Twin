@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { api } from "../lib/api";
 import { Panel, Badge, Button, EmptyState } from "../components/ui";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 function CoverageCell({ row, driftReachable, coveredBoth, twinOnly, productionOnly }) {
   let state = "none";
@@ -68,6 +69,11 @@ export default function CoveragePage() {
   const coveredBothSet = new Set(drift ? drift.covered_both : []);
   const twinOnlySet = new Set(drift ? drift.twin_only : []);
   const productionOnlySet = new Set(drift ? drift.production_only : []);
+  const tacticStats = Object.entries(grouped).map(([tactic, rows]) => ({
+    tactic,
+    total: rows.length,
+    verified: rows.filter((r) => r.rule_passes).length,
+  }));
 
   return (
     <div className="space-y-6">
@@ -100,6 +106,18 @@ export default function CoveragePage() {
                 Wazuh unreachable — showing twin-verified coverage only, production comparison unavailable.
               </div>
             )}
+            <div className="mb-6">
+              <ResponsiveContainer width="100%" height={Math.max(200, tacticStats.length * 28)}>
+                <BarChart data={tacticStats} layout="vertical" margin={{ left: 24 }}>
+                  <CartesianGrid stroke="#1a2740" strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" stroke="#64748b" fontSize={10} />
+                  <YAxis dataKey="tactic" type="category" stroke="#64748b" fontSize={10} width={140} />
+                  <Tooltip contentStyle={{ background: "#111a29", border: "1px solid #1a2740", fontSize: 12 }} />
+                  <Bar dataKey="total" fill="#1a2740" name="Total techniques" />
+                  <Bar dataKey="verified" fill="#22d3ee" name="Twin verified" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
             {Object.entries(grouped).map(([tactic, rows]) => (
               <div key={tactic}>
                 <div className="mb-2 font-mono text-[11px] uppercase tracking-widest text-graphite-400">
