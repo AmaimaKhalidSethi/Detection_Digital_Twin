@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArchiveIcon, ChevronLeft, ChevronRight, Pencil, Search, ShieldCheck } from "lucide-react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { api } from "../lib/api";
 import { Badge, Button, EmptyState, ErrorNote, Panel } from "../components/ui";
 import RuleEditorPage from "./RuleEditorPage";
@@ -14,6 +15,7 @@ export default function RulesLibraryPage() {
   const [page, setPage] = useState(1);
   const [editor, setEditor] = useState(null);
   const [error, setError] = useState(null);
+  const [allRules, setAllRules] = useState([]);
 
   const refresh = async () => {
     setLoading(true);
@@ -33,6 +35,10 @@ export default function RulesLibraryPage() {
   useEffect(() => {
     refresh();
   }, [searchQuery, statusFilter]);
+
+  useEffect(() => {
+    api.listRules().then(setAllRules);
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -86,13 +92,49 @@ export default function RulesLibraryPage() {
     );
   }
 
+  const SOURCE_COLORS = { manual: "#22d3ee", sigma_import: "#e879f9", wazuh_live: "#a3e635" };
+  const sourceCounts = allRules.reduce((acc, rule) => {
+    const key = rule.source || "unknown";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const sourceData = Object.entries(sourceCounts).map(([source, count]) => ({
+    name: source,
+    value: count,
+  }));
+
   return (
     <Panel
       title="Rule library"
       eyebrow={`${rules.length} rule${rules.length === 1 ? "" : "s"}`}
       actions={<Button onClick={() => setEditor({ ruleId: null, initialYaml: null })}>New rule</Button>}
-    >
+      >
       <div className="space-y-3">
+        {sourceData.length > 0 && (
+          <div className="flex items-center gap-4 rounded-md border border-bg-800 p-3">
+            <ResponsiveContainer width={80} height={80}>
+              <PieChart>
+                <Pie data={sourceData} dataKey="value" innerRadius={22} outerRadius={36}>
+                  {sourceData.map((entry) => (
+                    <Cell key={entry.name} fill={SOURCE_COLORS[entry.name] || "#64748b"} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ background: "#111a29", border: "1px solid #1a2740", fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap gap-3 font-mono text-[11px] text-slate-500">
+              {sourceData.map((entry) => (
+                <span key={entry.name} className="flex items-center gap-1.5">
+                  <span
+                    className="h-2 w-2 rounded-sm"
+                    style={{ backgroundColor: SOURCE_COLORS[entry.name] || "#64748b" }}
+                  />
+                  {entry.name} ({entry.value})
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex flex-col gap-2 sm:flex-row">
           <label className="flex items-center gap-2 rounded-md border border-graphite-700 bg-graphite-950 px-3 py-2 text-sm text-graphite-300">
             <Search size={14} className="text-graphite-500" />
