@@ -136,8 +136,8 @@ export default function RulesLibraryPage() {
           </div>
         )}
         <div className="flex flex-col gap-2 sm:flex-row">
-          <label className="flex items-center gap-2 rounded-md border border-graphite-700 bg-graphite-950 px-3 py-2 text-sm text-graphite-300">
-            <Search size={14} className="text-graphite-500" />
+          <label className="flex items-center gap-2 rounded-md border border-bg-800 bg-bg-950 px-3 py-2 text-sm text-slate-300">
+            <Search size={14} className="text-slate-500" />
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
@@ -148,7 +148,7 @@ export default function RulesLibraryPage() {
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded-md border border-graphite-700 bg-graphite-950 px-3 py-2 text-sm text-graphite-200"
+            className="rounded-md border border-bg-800 bg-bg-950 px-3 py-2 text-sm text-slate-300"
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>
@@ -160,25 +160,25 @@ export default function RulesLibraryPage() {
         <ErrorNote message={error} />
 
         {loading ? (
-          <p className="text-sm text-graphite-400">Loading...</p>
+          <p className="text-sm text-slate-500">Loading...</p>
         ) : rules.length === 0 ? (
           <EmptyState title="No matching rules" hint="Try a different search term or create a new rule." />
         ) : (
           <>
-            <ul className="divide-y divide-graphite-700">
+            <ul className="divide-y divide-bg-800">
               {pagedRules.map((rule) => (
                 <li key={rule.rule_id} className="py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <ShieldCheck size={14} className="shrink-0 text-signal-400" />
-                        <span className="truncate text-sm text-graphite-100">{rule.title}</span>
+                        <ShieldCheck size={14} className="shrink-0 text-cyan-400" />
+                        <span className="truncate text-sm text-slate-300">{rule.title}</span>
                         <Badge>{rule.status}</Badge>
                         <Badge>v{rule.version_number}</Badge>
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         {(rule.mitre_techniques || []).length === 0 ? (
-                          <span className="font-mono text-[11px] text-graphite-500">no MITRE tags</span>
+                          <span className="font-mono text-[11px] text-slate-500">no MITRE tags</span>
                         ) : (
                           rule.mitre_techniques.map((technique) => (
                             <Badge key={technique} tone="signal">{technique}</Badge>
@@ -190,7 +190,7 @@ export default function RulesLibraryPage() {
                       <button
                         type="button"
                         onClick={() => handleEdit(rule.rule_id)}
-                        className="rounded p-1.5 text-graphite-500 hover:bg-signal-500/10 hover:text-signal-400"
+                        className="rounded p-1.5 text-slate-500 hover:bg-cyan-500/10 hover:text-cyan-400"
                         aria-label={`Edit ${rule.title}`}
                       >
                         <Pencil size={14} />
@@ -198,7 +198,7 @@ export default function RulesLibraryPage() {
                       <button
                         type="button"
                         onClick={() => handleArchive(rule.rule_id)}
-                        className="rounded p-1.5 text-graphite-500 hover:bg-alert-500/10 hover:text-alert-400"
+                        className="rounded p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-400"
                         aria-label={`Archive ${rule.title}`}
                       >
                         <ArchiveIcon size={14} />
@@ -209,8 +209,8 @@ export default function RulesLibraryPage() {
               ))}
             </ul>
 
-            <div className="flex items-center justify-between border-t border-graphite-700 pt-3">
-              <div className="font-mono text-[11px] text-graphite-500">
+            <div className="flex items-center justify-between border-t border-bg-800 pt-3">
+              <div className="font-mono text-[11px] text-slate-500">
                 Showing {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, rules.length)} of {rules.length}
               </div>
               <div className="flex items-center gap-2">

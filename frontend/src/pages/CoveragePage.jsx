@@ -96,7 +96,7 @@ export default function CoveragePage() {
         }
       >
         {loading ? (
-          <p className="text-sm text-graphite-400">Loading...</p>
+          <p className="text-sm text-slate-500">Loading...</p>
         ) : coverage.length === 0 ? (
           <EmptyState title="No techniques in the curated library yet" />
         ) : (
@@ -120,7 +120,7 @@ export default function CoveragePage() {
             </div>
             {Object.entries(grouped).map(([tactic, rows]) => (
               <div key={tactic}>
-                <div className="mb-2 font-mono text-[11px] uppercase tracking-widest text-graphite-400">
+                <div className="mb-2 font-mono text-[11px] uppercase tracking-widest text-slate-500">
                   {tactic}
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(44px,1fr))] gap-1">

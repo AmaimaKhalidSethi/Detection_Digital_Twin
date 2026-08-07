@@ -38,7 +38,7 @@ export default function AlertsPage() {
                     <div className="text-xs text-slate-500">
                       Author: {a.rule_author || "Unknown"}
                     </div>
-                    <div className="font-mono text-[11px] text-graphite-500">
+                    <div className="font-mono text-[11px] text-slate-500">
                       {new Date(a.evaluated_at).toLocaleString()}
                     </div>
                   </div>
