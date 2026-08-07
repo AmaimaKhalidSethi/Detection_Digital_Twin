@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import io
 from datetime import datetime, timezone
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy.orm import Session
 
 from app.models.db import (
@@ -700,6 +706,87 @@ def production_drift(db: Session = Depends(get_db)):
         "twin_only": twin_only,
         "production_only": production_only,
     }
+
+
+@app.get("/reports/summary")
+def report_summary(db: Session = Depends(get_db)):
+    """Generates a PDF summary of current coverage and production drift status."""
+    coverage_data = coverage(db)
+    drift_data = production_drift(db)
+
+    technique_names = {row["technique_id"]: row["name"] for row in coverage_data}
+    verified_count = sum(1 for row in coverage_data if row["rule_passes"])
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+
+    story.append(Paragraph("Detection Digital Twin — Coverage & Drift Summary", styles["Title"]))
+    story.append(Paragraph(datetime.now(timezone.utc).strftime("Generated %Y-%m-%d %H:%M UTC"), styles["Normal"]))
+    story.append(Spacer(1, 20))
+
+    story.append(Paragraph("Summary", styles["Heading2"]))
+    summary_table = Table([
+        ["Total ATT&CK techniques", str(len(coverage_data))],
+        ["Twin-verified techniques", str(verified_count)],
+        ["Wazuh reachable", str(drift_data["wazuh_reachable"])],
+        ["Wazuh active technique rules", str(drift_data.get("production_active_count", "N/A"))],
+        ["Covered by both twin and production", str(len(drift_data.get("covered_both", [])))],
+        ["Blind spots (twin verified, production has no rule)", str(len(drift_data.get("twin_only", [])))],
+    ], colWidths=[300, 150])
+    summary_table.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a2740")),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 20))
+
+    if drift_data.get("twin_only"):
+        story.append(Paragraph("Production Blind Spots", styles["Heading2"]))
+        story.append(Paragraph(
+            "The following techniques have been verified as detectable by the digital twin, "
+            "but the real Wazuh production instance currently has no active rule for them:",
+            styles["Normal"],
+        ))
+        rows = [["Technique ID", "Name"]] + [
+            [tid, technique_names.get(tid, "Unknown")] for tid in drift_data["twin_only"]
+        ]
+        blind_spot_table = Table(rows, colWidths=[100, 350])
+        blind_spot_table.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a2740")),
+        ]))
+        story.append(blind_spot_table)
+        story.append(Spacer(1, 20))
+
+    story.append(Paragraph("Methodology", styles["Heading2"]))
+    story.append(Paragraph(
+        "Techniques are marked verified when a rule, evaluated by the twin's custom Sigma "
+        "matcher against synthetic and Atomic Red Team-derived telemetry for that specific "
+        "technique, produces a match. Production coverage is pulled live from the Wazuh "
+        "manager REST API's enabled rule set and its declared MITRE ATT&CK mappings.",
+        styles["Normal"],
+    ))
+    story.append(Spacer(1, 12))
+
+    story.append(Paragraph("Known Limitations", styles["Heading2"]))
+    story.append(Paragraph(
+        "Rules whose logsource category is network_connection may produce false-positive "
+        "confirmations against Atomic-derived synthetic telemetry, since the current "
+        "telemetry generator emits only process-creation fields (Image, CommandLine) and "
+        "does not populate network fields such as DestinationIp. This is a disclosed, "
+        "understood limitation, not a silent gap.",
+        styles["Normal"],
+    ))
+
+    doc.build(story)
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=detection-digital-twin-report.pdf"},
+    )
 
 
 @app.get("/drift/production/history")
