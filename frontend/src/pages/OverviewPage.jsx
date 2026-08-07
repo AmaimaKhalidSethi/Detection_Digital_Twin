@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Download } from "lucide-react";
 import { api } from "../lib/api";
 import { Panel, Badge, Button, EmptyState, ErrorNote } from "../components/ui";
 
@@ -49,7 +50,16 @@ export default function OverviewPage() {
       <Panel
         eyebrow="DETECTION DIGITAL TWIN"
         title="Overview"
-        actions={<Button variant="secondary" onClick={load}>Refresh</Button>}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={load}>Refresh</Button>
+            <a href={`${import.meta.env.VITE_API_URL || "http://127.0.0.1:8123"}/reports/summary`}>
+              <Button variant="secondary">
+                <span className="flex items-center gap-1.5"><Download size={14} /> Download report</span>
+              </Button>
+            </a>
+          </div>
+        }
       >
         {error && <ErrorNote message={error} />}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
