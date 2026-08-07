@@ -23,19 +23,19 @@ export default function AlertsPage() {
   return (
     <Panel title="Alert feed" eyebrow={`${alerts.length} alert(s)`}>
       {loading ? (
-        <p className="text-sm text-graphite-400">Loading...</p>
+        <p className="text-sm text-slate-500">Loading...</p>
       ) : alerts.length === 0 ? (
         <EmptyState title="No alerts yet" hint="Run a simulation that a rule detects." />
       ) : (
-        <ul className="divide-y divide-graphite-700">
+        <ul className="divide-y divide-bg-800">
           {alerts.map((a) => (
             <li key={a.alert_id} className="flex flex-col gap-3 py-3">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <AlertTriangle size={16} className="text-alert-400" />
+                  <AlertTriangle size={16} className="text-rose-400" />
                   <div>
-                    <div className="text-sm text-graphite-100">{a.rule_title}</div>
-                    <div className="text-xs text-graphite-400">
+                    <div className="text-sm text-slate-300">{a.rule_title}</div>
+                    <div className="text-xs text-slate-500">
                       Author: {a.rule_author || "Unknown"}
                     </div>
                     <div className="font-mono text-[11px] text-graphite-500">
@@ -50,7 +50,7 @@ export default function AlertsPage() {
                   <Sparkles size={14} />Explain match
                 </Button>
                 {explanations[a.alert_id] ? (
-                  <div className="max-w-2xl rounded-md border border-graphite-700 bg-graphite-950 px-3 py-2 font-mono text-[11px] text-graphite-400">
+                  <div className="max-w-2xl rounded-md border border-bg-800 bg-bg-950 px-3 py-2 font-mono text-[11px] text-slate-500">
                     {explanations[a.alert_id].explanation}
                   </div>
                 ) : null}

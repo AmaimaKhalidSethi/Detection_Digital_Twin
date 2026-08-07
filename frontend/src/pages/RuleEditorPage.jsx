@@ -83,7 +83,7 @@ export default function RuleEditorPage({ ruleId = null, initialYaml = "", onSave
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-graphite-700 bg-graphite-950 p-2">
+      <div className="rounded-lg border border-bg-800 bg-bg-950 p-2">
         <Editor
           height="480px"
           language="yaml"
@@ -102,12 +102,12 @@ export default function RuleEditorPage({ ruleId = null, initialYaml = "", onSave
 
       <Panel title="Validation" eyebrow={ruleId ? "Edit rule" : "New rule"}>
         {validationState.status === "pending" ? (
-          <div className="font-mono text-[11px] text-graphite-400">Validating YAML…</div>
+          <div className="font-mono text-[11px] text-slate-500">Validating YAML…</div>
         ) : validationState.valid ? (
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="signal">Valid Sigma rule</Badge>
             {validationState.techniques.length === 0 ? (
-              <span className="font-mono text-[11px] text-graphite-500">No MITRE techniques detected.</span>
+              <span className="font-mono text-[11px] text-slate-500">No MITRE techniques detected.</span>
             ) : (
               validationState.techniques.map((technique) => (
                 <Badge key={technique}>{technique}</Badge>
