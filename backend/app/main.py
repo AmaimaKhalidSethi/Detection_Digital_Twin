@@ -12,9 +12,10 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy.orm import Session
-
+from passlib.context import CryptContext
+from jose import jwt
 from app.models.db import (
-    make_engine, make_session_factory, init_db,
+    make_engine, make_session_factory, init_db, User,
     DetectionRule, RuleVersion, RuleTechniqueMap, SimulationRun, GeneratedLog,
     DetectionResult, DriftRecord, Job, ProductionDriftSnapshot,
 )
@@ -39,7 +40,9 @@ from app.mitre.attack_data_loader import all_techniques
 engine = make_engine()
 SessionLocal = make_session_factory(engine)
 init_db(engine)
-
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+JWT_SECRET = "change-this-secret-key-later"
+JWT_ALGORITHM = "HS256"
 app = FastAPI(title="Detection Digital Twin API", version="0.1.0")
 
 app.add_middleware(
@@ -48,7 +51,62 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
+class SignupRequest(BaseModel):
+    username: str
+    password: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+def create_access_token(user_id: str, username: str) -> str:
+    payload = {"sub": user_id, "username": username}
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+@app.post("/signup")
+def signup(payload: SignupRequest, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.username == payload.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    new_user = User(
+        username=payload.username,
+        password_hash=pwd_context.hash(payload.password),
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    token = create_access_token(new_user.id, new_user.username)
+    return {"token": token, "username": new_user.username}
+
+@app.post("/login")
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == payload.username).first()
+    if not user or not pwd_context.verify(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token = create_access_token(user.id, user.username)
+    return {"token": token, "username": user.username}
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+security_scheme = HTTPBearer()
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    user = db.query(User).filter(User.id == payload.get("sub")).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
 
 def get_db():
     db = SessionLocal()
@@ -190,24 +248,24 @@ def _run_full_matrix_evaluation(job_id: str) -> None:
 # -------------------------------------------------------------- MITRE (FR-08)
 
 @app.get("/mitre/techniques")
-def list_techniques():
+def list_techniques(current_user: User = Depends(get_current_user)):
     return [{"technique_id": k, **v} for k, v in all_techniques().items()]
 
 
 @app.get("/simulator/techniques")
-def list_simulatable_techniques():
+def list_simulatable_techniques(current_user: User = Depends(get_current_user)):
     return available_simulation_techniques()
 
 
 @app.get("/simulator/coverage-gaps")
-def list_simulation_coverage_gaps():
+def list_simulation_coverage_gaps(current_user: User = Depends(get_current_user)):
     return simulation_coverage_gaps()
 
 
 # --------------------------------------------------------- Rules (FR-01..03)
 
 @app.post("/rules/validate")
-def validate_rule(payload: RuleUploadRequest):
+def validate_rule(payload: RuleUploadRequest, current_user: User = Depends(get_current_user)):
     result = validate_rule_yaml(payload.yaml_content)
     return {
         "valid": result.valid,
@@ -218,7 +276,7 @@ def validate_rule(payload: RuleUploadRequest):
 
 
 @app.post("/rules")
-def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
+def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     result = validate_rule_yaml(payload.yaml_content)
     if not result.valid:
         raise HTTPException(status_code=422, detail={"errors": result.errors})
@@ -258,7 +316,7 @@ def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
 
 
 @app.put("/rules/{rule_id}")
-def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(get_db)):
+def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     rule = db.get(DetectionRule, rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -297,7 +355,7 @@ def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(
 
 
 @app.get("/rules")
-def list_rules(db: Session = Depends(get_db), status: str | None = None):
+def list_rules(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), status: str | None = None):
     query = db.query(DetectionRule)
     if status is None:
         query = query.filter(DetectionRule.status != "archived")
@@ -328,12 +386,12 @@ def list_rules(db: Session = Depends(get_db), status: str | None = None):
     return out
 
 
-@app.get("/rules/search")
-def search_rule_index(q: str = "", tactic: str | None = None, platform: str | None = None, status: str | None = None, db: Session = Depends(get_db)):
+@app.get("/rules/search") 
+def search_rule_index(q: str = "", tactic: str | None = None, platform: str | None = None, status: str | None = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return search_rules(db, q, tactic=tactic, platform=platform, status=status)
 
 
-@app.get("/rules/{rule_id}")
+
 def get_rule(rule_id: str, db: Session = Depends(get_db)):
     rule = db.get(DetectionRule, rule_id)
     if not rule:
@@ -355,7 +413,7 @@ def get_rule(rule_id: str, db: Session = Depends(get_db)):
 
 # Archive a rule (soft delete - preserves version history for drift reporting)
 @app.delete("/rules/{rule_id}")
-def delete_rule(rule_id: str, db: Session = Depends(get_db)):
+def delete_rule(rule_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     rule = db.get(DetectionRule, rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -368,7 +426,7 @@ def delete_rule(rule_id: str, db: Session = Depends(get_db)):
 # ---------------------------------------------------------- Simulation (FR-05)
 
 @app.post("/simulations")
-def run_simulation_endpoint(payload: SimulateRequest, db: Session = Depends(get_db)):
+def run_simulation_endpoint(payload: SimulateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if payload.technique_id not in available_simulation_techniques():
         raise HTTPException(status_code=400, detail=f"No simulation for technique {payload.technique_id}")
 
@@ -393,7 +451,7 @@ def run_simulation_endpoint(payload: SimulateRequest, db: Session = Depends(get_
 
 
 @app.get("/simulations")
-def list_simulations(db: Session = Depends(get_db)):
+def list_simulations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     runs = db.query(SimulationRun).order_by(SimulationRun.started_at.desc()).all()
     return [
         {"simulation_run_id": r.id, "technique_id": r.technique_id, "status": r.status,
@@ -432,7 +490,7 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/rules/{rule_id}/suggest-techniques")
-def suggest_rule_techniques_endpoint(rule_id: str, db: Session = Depends(get_db)):
+def suggest_rule_techniques_endpoint(rule_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     rule = db.get(DetectionRule, rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -449,9 +507,9 @@ def suggest_rule_techniques_endpoint(rule_id: str, db: Session = Depends(get_db)
         "source": "ai_suggested",
     }
 
-
+@app.get("/rules/{rule_id}")
 @app.post("/rules/{rule_id}/test")
-def test_rule(rule_id: str, db: Session = Depends(get_db)):
+def test_rule(rule_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     rule = db.get(DetectionRule, rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -489,7 +547,7 @@ def test_rule(rule_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/evaluate")
-def evaluate(payload: EvaluateRequest, db: Session = Depends(get_db)):
+def evaluate(payload: EvaluateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     run = db.get(SimulationRun, payload.simulation_run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Simulation run not found")
@@ -541,7 +599,7 @@ def evaluate(payload: EvaluateRequest, db: Session = Depends(get_db)):
 
 
 @app.get("/alerts")
-def list_alerts(db: Session = Depends(get_db)):
+def list_alerts(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     results = (
         db.query(DetectionResult)
         .filter(DetectionResult.matched == True)  # noqa: E712
@@ -566,7 +624,7 @@ def list_alerts(db: Session = Depends(get_db)):
 
 
 @app.get("/alerts/{alert_id}/explain")
-def explain_alert(alert_id: str, db: Session = Depends(get_db)):
+def explain_alert(alert_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     result = db.get(DetectionResult, alert_id)
     if not result:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -593,7 +651,7 @@ def explain_alert(alert_id: str, db: Session = Depends(get_db)):
 
 # ------------------------------------------------------- Coverage / Drift (FR-09/10)
 
-@app.get("/coverage")
+
 def coverage(db: Session = Depends(get_db)):
     """
     A rule only counts as covering a technique if it fired on an evaluation
@@ -621,7 +679,7 @@ def coverage(db: Session = Depends(get_db)):
 
 
 @app.get("/coverage/navigator-layer")
-def coverage_navigator_layer(db: Session = Depends(get_db)):
+def coverage_navigator_layer(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     coverage_rows = coverage(db=db)
     techniques = []
     for row in coverage_rows:
@@ -651,7 +709,7 @@ def coverage_navigator_layer(db: Session = Depends(get_db)):
 
 
 @app.get("/drift/production")
-def production_drift(db: Session = Depends(get_db)):
+def production_drift(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     Compares the digital twin's verified technique coverage against the real
     Wazuh production instance's actively enabled rules, to detect drift
@@ -709,10 +767,10 @@ def production_drift(db: Session = Depends(get_db)):
 
 
 @app.get("/reports/summary")
-def report_summary(db: Session = Depends(get_db)):
+def report_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Generates a PDF summary of current coverage and production drift status."""
     coverage_data = coverage(db)
-    drift_data = production_drift(db)
+    drift_data = production_drift(db, current_user)
 
     technique_names = {row["technique_id"]: row["name"] for row in coverage_data}
     verified_count = sum(1 for row in coverage_data if row["rule_passes"])
@@ -790,7 +848,7 @@ def report_summary(db: Session = Depends(get_db)):
 
 
 @app.get("/drift/production/history")
-def production_drift_history(db: Session = Depends(get_db), limit: int = 30):
+def production_drift_history(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), limit: int = 30):
     rows = (
         db.query(ProductionDriftSnapshot)
         .order_by(ProductionDriftSnapshot.created_at.desc())
@@ -812,7 +870,7 @@ def production_drift_history(db: Session = Depends(get_db), limit: int = 30):
 
 
 @app.get("/drift")
-def drift(db: Session = Depends(get_db)):
+def drift(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     results = db.query(DetectionResult).order_by(DetectionResult.evaluated_at.asc()).all()
     history = []
     for r in results:

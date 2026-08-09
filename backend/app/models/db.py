@@ -28,6 +28,9 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(32), default="analyst")
     created_at = Column(DateTime, default=_now)
+    wazuh_url = Column(String(255), nullable=True)
+    wazuh_username = Column(String(128), nullable=True)
+    wazuh_password = Column(String(255), nullable=True)
 
 
 class DetectionRule(Base):

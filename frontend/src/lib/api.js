@@ -1,8 +1,12 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8123";
+let authToken = localStorage.getItem("ddt_token") || null;
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
     ...options,
   });
   const isJson = res.headers.get("content-type")?.includes("application/json");
@@ -18,6 +22,27 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  login: (username, password) =>
+    request("/login", { method: "POST", body: JSON.stringify({ username, password }) }).then((res) => {
+      authToken = res.token;
+      localStorage.setItem("ddt_token", res.token);
+      localStorage.setItem("ddt_username", res.username);
+      return res;
+    }),
+  signup: (username, password) =>
+    request("/signup", { method: "POST", body: JSON.stringify({ username, password }) }).then((res) => {
+      authToken = res.token;
+      localStorage.setItem("ddt_token", res.token);
+      localStorage.setItem("ddt_username", res.username);
+      return res;
+    }),
+  logout: () => {
+    authToken = null;
+    localStorage.removeItem("ddt_token");
+    localStorage.removeItem("ddt_username");
+  },
+  isLoggedIn: () => !!authToken,
+
   listRules: () => request("/rules"),
   searchRules: (q = "", filters = {}) => {
     const params = new URLSearchParams();
