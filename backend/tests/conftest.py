@@ -11,6 +11,11 @@ import pytest
 # file, never backend/ddt.db used by the application and seed scripts.
 TEST_DATABASE_PATH = Path(tempfile.gettempdir()) / f"detection-digital-twin-pytest-{uuid.uuid4()}.db"
 os.environ["DDT_DATABASE_URL"] = f"sqlite:///{TEST_DATABASE_PATH.as_posix()}"
+# Legacy feature tests intentionally exercise domain workflows without a login.
+# The application remains secure by default; auth-specific tests enable the
+# guard explicitly and use this non-production signing secret.
+os.environ["DDT_AUTH_REQUIRED"] = "false"
+os.environ["JWT_SECRET"] = "test-only-jwt-secret-that-is-at-least-32-characters-long"
 
 from app.models.db import Base
 from app.main import engine

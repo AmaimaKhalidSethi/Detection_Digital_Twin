@@ -26,8 +26,137 @@ class User(Base):
     id = Column(String, primary_key=True, default=_uuid)
     username = Column(String(64), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(32), default="analyst")
+    role = Column(String(32), default="analyst", nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=_now)
+
+
+class Environment(Base):
+    __tablename__ = "environments"
+    id = Column(String, primary_key=True, default=_uuid)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(32), default="active")
+    created_at = Column(DateTime, default=_now)
+    last_sync_at = Column(DateTime, nullable=True)
+
+    endpoints = relationship("Endpoint", back_populates="environment", cascade="all, delete-orphan")
+    detection_platforms = relationship("DetectionPlatform", back_populates="environment", cascade="all, delete-orphan")
+    snapshots = relationship("EnvironmentSnapshot", back_populates="environment", cascade="all, delete-orphan")
+    validation_runs = relationship("ValidationRun", back_populates="environment", cascade="all, delete-orphan")
+    detection_gaps = relationship("DetectionGap", back_populates="environment", cascade="all, delete-orphan")
+    wazuh_rules = relationship("WazuhRule", back_populates="environment", cascade="all, delete-orphan")
+
+
+class Endpoint(Base):
+    __tablename__ = "endpoints"
+    id = Column(String, primary_key=True, default=_uuid)
+    environment_id = Column(String, ForeignKey("environments.id"), nullable=False)
+    hostname = Column(String(255), nullable=False)
+    operating_system = Column(String(64), nullable=True)
+    agent_id = Column(String(64), nullable=True)
+    agent_status = Column(String(32), nullable=True)
+    agent_version = Column(String(64), nullable=True)
+    last_seen = Column(DateTime, nullable=True)
+    metadata_json = Column("metadata", JSON, default=dict)
+    created_at = Column(DateTime, default=_now)
+
+    environment = relationship("Environment", back_populates="endpoints")
+    telemetry_sources = relationship("TelemetrySource", back_populates="endpoint", cascade="all, delete-orphan")
+    validation_runs = relationship("ValidationRun", back_populates="endpoint", cascade="all, delete-orphan")
+
+
+class TelemetrySource(Base):
+    __tablename__ = "telemetry_sources"
+    id = Column(String, primary_key=True, default=_uuid)
+    endpoint_id = Column(String, ForeignKey("endpoints.id"), nullable=False)
+    source_type = Column(String(64), nullable=False)
+    status = Column(String(32), default="active")
+    version = Column(String(64), nullable=True)
+    metadata_json = Column("metadata", JSON, default=dict)
+    created_at = Column(DateTime, default=_now)
+
+    endpoint = relationship("Endpoint", back_populates="telemetry_sources")
+
+
+class DetectionPlatform(Base):
+    __tablename__ = "detection_platforms"
+    id = Column(String, primary_key=True, default=_uuid)
+    environment_id = Column(String, ForeignKey("environments.id"), nullable=False)
+    platform_type = Column(String(64), nullable=False)
+    version = Column(String(64), nullable=True)
+    manager_url = Column(String(512), nullable=True)
+    status = Column(String(32), default="active")
+    last_sync_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_now)
+
+    environment = relationship("Environment", back_populates="detection_platforms")
+
+
+class EnvironmentSnapshot(Base):
+    __tablename__ = "environment_snapshots"
+    id = Column(String, primary_key=True, default=_uuid)
+    environment_id = Column(String, ForeignKey("environments.id"), nullable=False)
+    snapshot_timestamp = Column(DateTime, default=_now, nullable=False)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    environment = relationship("Environment", back_populates="snapshots")
+
+
+class ValidationRun(Base):
+    __tablename__ = "validation_runs"
+    id = Column(String, primary_key=True, default=_uuid)
+    environment_id = Column(String, ForeignKey("environments.id"), nullable=False)
+    endpoint_id = Column(String, ForeignKey("endpoints.id"), nullable=True)
+    telemetry_artifact_id = Column(String, ForeignKey("telemetry_artifacts.id"), nullable=True)
+    rule_version_id = Column(String, ForeignKey("rule_versions.id"), nullable=True)
+    technique_id = Column(String(32), nullable=True)
+    simulation_id = Column(String(64), nullable=True)
+    expected_detection = Column(String(32), nullable=True)
+    observed_detection = Column(String(32), nullable=True)
+    twin_observed_detection = Column(String(32), nullable=True)
+    twin_evidence_json = Column("twin_evidence", JSON, default=dict)
+    status = Column(String(32), default="PREDICTED")
+    started_at = Column(DateTime, default=_now)
+    completed_at = Column(DateTime, nullable=True)
+    evidence_json = Column("evidence", JSON, default=dict)
+
+    environment = relationship("Environment", back_populates="validation_runs")
+    endpoint = relationship("Endpoint", back_populates="validation_runs")
+    telemetry_artifact = relationship("TelemetryArtifact", back_populates="validation_runs")
+    rule_version = relationship("RuleVersion")
+
+
+class TelemetryArtifact(Base):
+    """Immutable provenance record for generated or imported telemetry."""
+    __tablename__ = "telemetry_artifacts"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    source_type = Column(String(32), nullable=False)
+    schema_version = Column(String(64), nullable=True)
+    raw_telemetry = Column(Text, nullable=True)
+    normalized_event = Column(JSON, nullable=False)
+    content_hash = Column(String(64), nullable=False, index=True)
+    simulation_run_id = Column(String, ForeignKey("simulation_runs.id"), nullable=True)
+    created_at = Column(DateTime, default=_now, nullable=False)
+
+    validation_runs = relationship("ValidationRun", back_populates="telemetry_artifact")
+
+
+class DetectionGap(Base):
+    __tablename__ = "detection_gaps"
+    id = Column(String, primary_key=True, default=_uuid)
+    environment_id = Column(String, ForeignKey("environments.id"), nullable=False)
+    technique_id = Column(String(32), nullable=True)
+    validation_run_id = Column(String, ForeignKey("validation_runs.id"), nullable=True)
+    severity = Column(String(32), default="medium")
+    reason = Column(Text, nullable=True)
+    recommendation = Column(Text, nullable=True)
+    status = Column(String(32), default="open")
+    created_at = Column(DateTime, default=_now)
+    resolved_at = Column(DateTime, nullable=True)
+
+    environment = relationship("Environment", back_populates="detection_gaps")
 
 
 class DetectionRule(Base):
@@ -96,6 +225,45 @@ class RuleTechniqueMap(Base):
     rule_version = relationship("RuleVersion", back_populates="technique_mappings")
 
 
+class WazuhRule(Base):
+    __tablename__ = "wazuh_rules"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    environment_id = Column(String, ForeignKey("environments.id"), nullable=False)
+    rule_id = Column(String(64), nullable=False)
+    description = Column(Text, nullable=True)
+    level = Column(String(32), nullable=True)
+    status = Column(String(32), nullable=True)
+    groups = Column(JSON, default=list)
+    decoder = Column(String(128), nullable=True)
+    source = Column(String(128), nullable=True)
+    metadata_json = Column("metadata", JSON, default=dict)
+    fingerprint = Column(String(64), nullable=True)
+    last_synced_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_now)
+
+    environment = relationship("Environment", back_populates="wazuh_rules")
+    technique_mappings = relationship(
+        "WazuhRuleTechnique",
+        back_populates="wazuh_rule",
+        cascade="all, delete-orphan",
+    )
+
+
+class WazuhRuleTechnique(Base):
+    __tablename__ = "wazuh_rule_techniques"
+    __table_args__ = (
+        Index("ix_wazuh_rule_techniques_rule_id", "wazuh_rule_id"),
+        Index("ix_wazuh_rule_techniques_technique_id", "technique_id"),
+    )
+
+    wazuh_rule_id = Column(String, ForeignKey("wazuh_rules.id"), primary_key=True)
+    technique_id = Column(String(32), primary_key=True)
+    created_at = Column(DateTime, default=_now, nullable=False)
+
+    wazuh_rule = relationship("WazuhRule", back_populates="technique_mappings")
+
+
 class Job(Base):
     __tablename__ = "jobs"
 
@@ -150,6 +318,7 @@ class GeneratedLog(Base):
     simulation_run_id = Column(String, ForeignKey("simulation_runs.id"), nullable=False)
     source_type = Column(String(32))
     normalized_event = Column(JSON)
+    telemetry_artifact_id = Column(String, ForeignKey("telemetry_artifacts.id"), nullable=True)
     captured_at = Column(DateTime, default=_now)
 
 
@@ -203,3 +372,25 @@ def init_db(engine):
             connection.execute(text("ALTER TABLE rule_versions ADD COLUMN license VARCHAR(64)"))
         if "source" not in columns:
             connection.execute(text("ALTER TABLE rule_versions ADD COLUMN source VARCHAR(32) DEFAULT 'manual'"))
+    # Authentication was introduced after the initial users table.  Keep
+    # existing local SQLite deployments compatible without a database rewrite.
+    user_columns = {column["name"] for column in inspect(engine).get_columns("users")}
+    with engine.begin() as connection:
+        if "is_active" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT 1 NOT NULL"))
+    validation_columns = {column["name"] for column in inspect(engine).get_columns("validation_runs")}
+    generated_log_columns = {column["name"] for column in inspect(engine).get_columns("generated_logs")}
+    wazuh_rule_columns = {column["name"] for column in inspect(engine).get_columns("wazuh_rules")}
+    with engine.begin() as connection:
+        if "telemetry_artifact_id" not in validation_columns:
+            connection.execute(text("ALTER TABLE validation_runs ADD COLUMN telemetry_artifact_id VARCHAR"))
+        if "rule_version_id" not in validation_columns:
+            connection.execute(text("ALTER TABLE validation_runs ADD COLUMN rule_version_id VARCHAR"))
+        if "twin_observed_detection" not in validation_columns:
+            connection.execute(text("ALTER TABLE validation_runs ADD COLUMN twin_observed_detection VARCHAR(32)"))
+        if "twin_evidence" not in validation_columns:
+            connection.execute(text("ALTER TABLE validation_runs ADD COLUMN twin_evidence JSON"))
+        if "telemetry_artifact_id" not in generated_log_columns:
+            connection.execute(text("ALTER TABLE generated_logs ADD COLUMN telemetry_artifact_id VARCHAR"))
+        if "fingerprint" not in wazuh_rule_columns:
+            connection.execute(text("ALTER TABLE wazuh_rules ADD COLUMN fingerprint VARCHAR(64)"))

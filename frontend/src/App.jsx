@@ -1,15 +1,19 @@
 import { useState } from "react";
-import { FileCode2, PlayCircle, Bell, FlaskConical, Grid3x3, Radar, GitCommitHorizontal, LayoutDashboard } from "lucide-react";
+import { FileCode2, PlayCircle, Bell, FlaskConical, Grid3x3, Radar, GitCommitHorizontal, LayoutDashboard, RefreshCw, LogOut, LoaderCircle } from "lucide-react";
+import { useAuth } from "./auth/AuthContext";
+import LoginPage from "./pages/LoginPage";
 import RulesLibraryPage from "./pages/RulesLibraryPage";
 import RuleTestingPage from "./pages/RuleTestingPage";
 import SimulatePage from "./pages/SimulatePage";
 import AlertsPage from "./pages/AlertsPage";
 import CoveragePage from "./pages/CoveragePage";
 import DriftPage from "./pages/DriftPage";
+import EnvironmentPage from "./pages/EnvironmentPage";
 import OverviewPage from "./pages/OverviewPage";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, component: OverviewPage },
+  { id: "environment", label: "Environment", icon: RefreshCw, component: EnvironmentPage },
   { id: "library", label: "Rule Library", icon: FileCode2, component: RulesLibraryPage },
   { id: "testing", label: "Rule Testing", icon: FlaskConical, component: RuleTestingPage },
   { id: "simulate", label: "Simulate", icon: PlayCircle, component: SimulatePage },
@@ -19,8 +23,14 @@ const TABS = [
 ];
 
 export default function App() {
+  const { user, status, logout } = useAuth();
   const [active, setActive] = useState("overview");
   const ActiveComponent = TABS.find((t) => t.id === active).component;
+
+  if (status === "checking") {
+    return <div className="console-bg flex min-h-screen items-center justify-center text-sm text-slate-500"><LoaderCircle size={18} className="mr-2 animate-spin text-cyan-400" /> Checking secure session…</div>;
+  }
+  if (status !== "authenticated") return <LoginPage />;
 
   return (
     <div className="console-bg min-h-screen">
@@ -37,7 +47,7 @@ export default function App() {
               </div>
             </div>
           </div>
-          <nav className="flex gap-1">
+          <nav className="flex items-center gap-1">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = tab.id === active;
@@ -56,6 +66,11 @@ export default function App() {
                 </button>
               );
             })}
+            <span className="mx-2 hidden h-5 w-px bg-bg-800 md:block" />
+            <span className="hidden font-mono text-[11px] text-slate-500 md:inline">{user.username}</span>
+            <button onClick={logout} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-slate-500 transition-colors hover:bg-bg-800 hover:text-slate-300">
+              <LogOut size={14} /> Logout
+            </button>
           </nav>
         </div>
       </header>

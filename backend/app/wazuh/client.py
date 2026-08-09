@@ -92,6 +92,127 @@ class WazuhClient:
             return None
         return data
 
+    def run_logtest(self, log_input: str) -> dict | None:
+        """Send a log sample to the Wazuh manager logtest endpoint and return a normalized result."""
+        if not isinstance(log_input, str):
+            raise TypeError("log_input must be a string")
+
+        token = self.get_token()
+        if token is None:
+            raise RuntimeError("Wazuh authentication unavailable")
+        if not self.base_url:
+            raise RuntimeError("Wazuh base URL is not configured")
+
+        url = f"{self.base_url.rstrip('/')}/logtest"
+        candidate_payloads = [
+            {"log": log_input},
+            {"event": log_input},
+            {"message": log_input},
+            {"input": log_input},
+        ]
+        last_error: Exception | None = None
+
+        for payload in candidate_payloads:
+            try:
+                response = requests.post(
+                    url,
+                    headers={"Authorization": f"Bearer {token}"},
+                    json=payload,
+                    verify=False,
+                    timeout=10,
+                )
+                if response.status_code == 401:
+                    raise RuntimeError("Wazuh authentication failed")
+                response.raise_for_status()
+
+                if not response.content:
+                    return {"matched": False}
+
+                try:
+                    data = response.json()
+                except ValueError:
+                    return {"matched": False, "message": response.text.strip() or "empty response"}
+
+                if isinstance(data, dict):
+                    if "data" in data and isinstance(data["data"], dict):
+                        return data["data"]
+                    return data
+
+                return {"matched": bool(data)}
+            except requests.exceptions.RequestException as exc:
+                last_error = exc
+            except RuntimeError as exc:
+                last_error = exc
+
+        raise RuntimeError("Wazuh logtest request failed") from last_error
+
+    def _paged_request(self, path: str, params: dict[str, int | str] | None = None) -> list[dict] | None:
+        token = self.get_token()
+        if token is None:
+            return None
+
+        items: list[dict] = []
+        offset = 0
+        limit = 500
+        total_affected_items: int | None = None
+        params = params.copy() if params else {}
+
+        while total_affected_items is None or offset < total_affected_items:
+            params.update({"limit": limit, "offset": offset})
+            try:
+                response = requests.get(
+                    f"{self.base_url.rstrip('/')}/{path.lstrip('/')}",
+                    headers={"Authorization": f"Bearer {token}"},
+                    params=params,
+                    verify=False,
+                    timeout=10,
+                )
+                response.raise_for_status()
+                data = response.json()
+            except requests.exceptions.RequestException as exc:
+                logger.warning("Wazuh %s request failed: %s", path, exc)
+                return None
+            except ValueError as exc:
+                logger.warning("Wazuh %s response was not valid JSON: %s", path, exc)
+                return None
+
+            if isinstance(data, dict) and "data" in data:
+                response_data = data["data"]
+            else:
+                response_data = data
+
+            if isinstance(response_data, dict) and "affected_items" in response_data:
+                batch = response_data.get("affected_items") or []
+                total_affected_items = response_data.get("total_affected_items")
+            elif isinstance(response_data, list):
+                batch = response_data
+                total_affected_items = len(batch)
+            else:
+                logger.warning("Wazuh %s response had an unexpected shape", path)
+                return None
+
+            if not isinstance(batch, list):
+                logger.warning("Wazuh %s response batch was not a list", path)
+                return None
+
+            for item in batch:
+                if isinstance(item, dict):
+                    items.append(item)
+
+            if total_affected_items is None:
+                break
+            offset += limit
+
+        return items
+
+    def get_agents(self) -> list[dict] | None:
+        """Return the inventory of Wazuh agents."""
+        return self._paged_request("agents")
+
+    def get_rules(self) -> list[dict] | None:
+        """Return the inventory of Wazuh rules."""
+        return self._paged_request("rules")
+
     def get_active_technique_ids(self) -> set[str] | None:
         """Return MITRE technique IDs referenced by enabled Wazuh rules."""
         token = self.get_token()

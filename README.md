@@ -24,7 +24,8 @@ configuration and coverage drift.
   (`app/detection_engine/matcher.py`) built on top of pySigma's parser — not a
   `wazuh-logtest` wrapper.
 - **Frontend**: React + Vite, Tailwind, Monaco-based rule editor.
-- **No authentication** — intentionally auth-free by design.
+- **Authentication**: short-lived JWT sessions in HttpOnly cookies, with a
+  controlled local user bootstrap and CSRF protection for browser writes.
 
 ### Core detection engine
 - Custom `RuleMatcher` evaluates Sigma AND/OR/NOT condition trees, wildcards, and
@@ -110,6 +111,15 @@ WAZUH_PASSWORD=<your-password>
 An LLM API key (`GROQ_API_KEY` / `GEMINI_API_KEY` / `OPENAI_API_KEY`) is optional — without
 one, AI-suggested technique mappings degrade to a no-op stub rather than failing.
 
+Authentication is enabled by default. Add the settings from `backend/.env.example` to the
+existing `backend/.env` without removing Wazuh or AI settings, then create the first internal
+administrator from a terminal (the password is prompted for and never printed):
+```powershell
+python -m scripts.create_user admin@example.internal --role admin
+```
+For HTTPS deployments set `AUTH_COOKIE_SECURE=true`. `JWT_SECRET` must be a unique random
+value of at least 32 characters and must remain server-side.
+
 Run the API:
 ```powershell
 uvicorn app.main:app --reload
@@ -127,7 +137,7 @@ npm run dev
 cd backend
 python -m pytest
 ```
-53 tests total, all passing once the vendored corpora and `mitreattack-python` are present.
+71 tests total, all passing once the vendored corpora and `mitreattack-python` are present.
 
 ## Detection quality notes
 
