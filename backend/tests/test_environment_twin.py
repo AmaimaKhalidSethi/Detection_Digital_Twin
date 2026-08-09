@@ -174,3 +174,23 @@ def test_environment_sync_manager_unavailable(monkeypatch):
     with SessionLocal() as db:
         assert db.query(Endpoint).count() == 0
         assert db.query(WazuhRule).count() == 0
+
+
+def test_configuration_drift_identifies_rule_status_and_content_changes(monkeypatch):
+    _create_environment()
+    state = {"status": "enabled", "description": "Original"}
+
+    class FakeWazuhClient:
+        base_url = "https://wazuh.test"
+        def get_manager_info(self): return {"data": {"version": "5.0.0"}}
+        def get_agents(self): return []
+        def get_active_technique_ids(self): return {"T1059.001"}
+        def get_rules(self):
+            return [{"rule_id": "100001", "description": state["description"], "status": state["status"], "mitre": ["T1059.001"]}]
+
+    monkeypatch.setattr("app.main.WazuhClient", FakeWazuhClient)
+    assert client.post("/environment/sync").status_code == 200
+    state.update(status="disabled", description="Updated")
+    assert client.post("/environment/sync").status_code == 200
+    changes = client.get("/drift/configuration").json()["changes"]
+    assert changes[0]["category"] == "RULE_STATUS_CHANGED"

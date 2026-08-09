@@ -89,12 +89,14 @@ export const api = {
   drift: () => request("/drift"),
   productionDrift: () => request("/drift/production"),
   productionDriftHistory: () => request("/drift/production/history"),
+  configurationDrift: (environmentId) => request(`/drift/configuration${environmentId ? `?environment_id=${environmentId}` : ""}`),
 
   listEnvironments: () => request("/environments"),
   createEnvironment: (body) => request("/environments", { method: "POST", body: JSON.stringify(body) }),
   listEnvironmentEndpoints: (environmentId) => request(`/environments/${environmentId}/endpoints`),
   syncEnvironment: () => request("/environment/sync", { method: "POST" }),
   listEnvironmentSnapshots: () => request("/environment/snapshots"),
+  ingestTelemetry: (body) => request("/telemetry/ingest", { method: "POST", body: JSON.stringify(body) }),
 
   createValidationRun: (body) => request("/validation-runs", { method: "POST", body: JSON.stringify(body) }),
   listValidationRuns: (environmentId) => request(`/validation-runs${environmentId ? `?environment_id=${environmentId}` : ""}`),

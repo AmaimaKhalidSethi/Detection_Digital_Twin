@@ -68,6 +68,16 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     return user if user is not None else resolve_current_user(request, db)
 
 
+def require_admin(request: Request, db: Session = Depends(get_db)) -> User | None:
+    """Small single-team authorization boundary for configuration changes."""
+    if not auth_required():
+        return None
+    user = get_current_user(request, db)
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Administrator role required")
+    return user
+
+
 @app.middleware("http")
 async def require_authentication(request: Request, call_next):
     """Apply the backend security boundary to every application API route.
@@ -303,6 +313,17 @@ def _extract_rule_techniques(rule: dict) -> list[str]:
     return []
 
 
+def _wazuh_rule_fingerprint(rule: WazuhRule) -> str:
+    """Fingerprint only fields actually returned by the Wazuh rule inventory."""
+    material = {
+        "rule_id": rule.rule_id, "description": rule.description, "level": rule.level,
+        "status": rule.status, "groups": sorted(rule.groups or []), "decoder": rule.decoder,
+        "source": rule.source,
+        "techniques": sorted(mapping.technique_id for mapping in rule.technique_mappings),
+    }
+    return hashlib.sha256(json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
 def _evaluate_validation_result(expected_detection: str | None, wazuh_result: dict | None) -> tuple[str | None, str, str | None, dict]:
     if wazuh_result is None:
         return None, "UNAVAILABLE", None, {"reason": "wazuh_unavailable"}
@@ -472,7 +493,7 @@ def list_environments(db: Session = Depends(get_db)):
 
 
 @app.post("/environments")
-def create_environment(payload: EnvironmentCreateRequest, db: Session = Depends(get_db)):
+def create_environment(payload: EnvironmentCreateRequest, db: Session = Depends(get_db), admin: User | None = Depends(require_admin)):
     environment = Environment(name=payload.name, description=payload.description, status=payload.status)
     db.add(environment)
     db.flush()
@@ -488,7 +509,7 @@ def create_environment(payload: EnvironmentCreateRequest, db: Session = Depends(
 
 
 @app.post("/environments/{environment_id}/endpoints")
-def create_endpoint(environment_id: str, payload: EndpointCreateRequest, db: Session = Depends(get_db)):
+def create_endpoint(environment_id: str, payload: EndpointCreateRequest, db: Session = Depends(get_db), admin: User | None = Depends(require_admin)):
     environment = db.get(Environment, environment_id)
     if not environment:
         raise HTTPException(status_code=404, detail="Environment not found")
@@ -539,7 +560,7 @@ def list_endpoints(environment_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/environment/sync")
-def sync_environment(db: Session = Depends(get_db)):
+def sync_environment(db: Session = Depends(get_db), admin: User | None = Depends(require_admin)):
     environment = db.query(Environment).order_by(Environment.created_at.asc()).first()
     if environment is None:
         environment = Environment(name="Home Detection Lab", description="Default digital twin environment", status="active")
@@ -681,6 +702,9 @@ def sync_environment(db: Session = Depends(get_db)):
                 if mapping.technique_id not in techniques:
                     db.delete(mapping)
 
+            db.flush()
+            wazuh_rule.fingerprint = _wazuh_rule_fingerprint(wazuh_rule)
+
             synced_rules += 1
 
     db.flush()
@@ -705,6 +729,10 @@ def sync_environment(db: Session = Depends(get_db)):
         "disabled_rule_count": disabled_rule_count,
         "technique_count": technique_count,
         "status": "ok",
+        "rule_inventory": {
+            rule.rule_id: {"status": rule.status, "fingerprint": rule.fingerprint}
+            for rule in persisted_wazuh_rules
+        },
     })
     db.add(snapshot)
 
@@ -719,6 +747,32 @@ def sync_environment(db: Session = Depends(get_db)):
         "alerts_synced": 0,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.get("/drift/configuration")
+def configuration_drift(environment_id: str | None = None, db: Session = Depends(get_db)):
+    """Compare the two latest captured Wazuh inventories for one environment."""
+    query = db.query(EnvironmentSnapshot).order_by(EnvironmentSnapshot.snapshot_timestamp.desc())
+    if environment_id:
+        query = query.filter(EnvironmentSnapshot.environment_id == environment_id)
+    snapshots = query.limit(2).all()
+    if len(snapshots) < 2:
+        return {"status": "insufficient_history", "changes": []}
+    current, previous = snapshots[0], snapshots[1]
+    current_rules = (current.metadata_json or {}).get("rule_inventory", {})
+    previous_rules = (previous.metadata_json or {}).get("rule_inventory", {})
+    changes = []
+    for rule_id in sorted(set(current_rules) | set(previous_rules)):
+        before, after = previous_rules.get(rule_id), current_rules.get(rule_id)
+        if before is None:
+            changes.append({"rule_id": rule_id, "category": "RULE_ADDED", "current": after})
+        elif after is None:
+            changes.append({"rule_id": rule_id, "category": "RULE_REMOVED", "previous": before})
+        elif before.get("status") != after.get("status"):
+            changes.append({"rule_id": rule_id, "category": "RULE_STATUS_CHANGED", "previous": before, "current": after})
+        elif before.get("fingerprint") != after.get("fingerprint"):
+            changes.append({"rule_id": rule_id, "category": "RULE_CONTENT_CHANGED", "previous": before, "current": after})
+    return {"status": "ok", "from": previous.snapshot_timestamp.isoformat(), "to": current.snapshot_timestamp.isoformat(), "changes": changes}
 
 
 @app.get("/environment/snapshots")
@@ -833,7 +887,7 @@ def create_validation_run(payload: ValidationRunCreateRequest, db: Session = Dep
         wazuh_result = wazuh_client.run_logtest(telemetry_input)
     except Exception as exc:  # pragma: no cover - exercised through mocked failures
         observed_detection = None
-        status = "INCONCLUSIVE"
+        status = "UNAVAILABLE"
         matched_rule_id = None
         evaluation_evidence = {"reason": "wazuh_unavailable", "error": str(exc)}
     else:
@@ -842,7 +896,10 @@ def create_validation_run(payload: ValidationRunCreateRequest, db: Session = Dep
             wazuh_result,
         )
 
-    status = _classify_validation(expected_detection, twin_observed_detection, observed_detection, twin_unavailable or status in {"UNAVAILABLE", "ERROR", "INCONCLUSIVE"})
+    final_classification = _classify_validation(
+        expected_detection, twin_observed_detection, observed_detection,
+        twin_unavailable or status in {"UNAVAILABLE", "ERROR", "INCONCLUSIVE"},
+    )
     evidence_payload = dict(payload.evidence or {})
     evidence_payload.update({
         "method": "wazuh_logtest",
@@ -866,6 +923,7 @@ def create_validation_run(payload: ValidationRunCreateRequest, db: Session = Dep
         observed_detection=observed_detection,
         twin_observed_detection=twin_observed_detection,
         twin_evidence_json=twin_evidence,
+        final_classification=final_classification,
         status=status,
         evidence_json=evidence_payload,
     )
@@ -901,6 +959,7 @@ def create_validation_run(payload: ValidationRunCreateRequest, db: Session = Dep
         "twin_observed_detection": validation_run.twin_observed_detection,
         "twin_evidence": validation_run.twin_evidence_json,
         "status": validation_run.status,
+        "final_classification": validation_run.final_classification,
         "validation_source": validation_source,
         "matched_rule_id": matched_rule_id,
         "evidence": validation_run.evidence_json,
@@ -929,6 +988,7 @@ def list_validation_runs(environment_id: str | None = None, db: Session = Depend
             "twin_observed_detection": run.twin_observed_detection,
             "twin_evidence": run.twin_evidence_json,
             "status": run.status,
+            "final_classification": run.final_classification,
             "validation_source": run.evidence_json.get("validation_source") if isinstance(run.evidence_json, dict) else None,
             "matched_rule_id": run.evidence_json.get("matched_rule_id") if isinstance(run.evidence_json, dict) else None,
             "evidence": run.evidence_json,
@@ -991,7 +1051,7 @@ def validate_rule(payload: RuleUploadRequest):
 
 
 @app.post("/rules")
-def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
+def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db), admin: User | None = Depends(require_admin)):
     result = validate_rule_yaml(payload.yaml_content)
     if not result.valid:
         raise HTTPException(status_code=422, detail={"errors": result.errors})
@@ -1031,7 +1091,7 @@ def upload_rule(payload: RuleUploadRequest, db: Session = Depends(get_db)):
 
 
 @app.put("/rules/{rule_id}")
-def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(get_db)):
+def update_rule(rule_id: str, payload: RuleUploadRequest, db: Session = Depends(get_db), admin: User | None = Depends(require_admin)):
     rule = db.get(DetectionRule, rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -1128,7 +1188,7 @@ def get_rule(rule_id: str, db: Session = Depends(get_db)):
 
 # Archive a rule (soft delete - preserves version history for drift reporting)
 @app.delete("/rules/{rule_id}")
-def delete_rule(rule_id: str, db: Session = Depends(get_db)):
+def delete_rule(rule_id: str, db: Session = Depends(get_db), admin: User | None = Depends(require_admin)):
     rule = db.get(DetectionRule, rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -1407,7 +1467,29 @@ def coverage(db: Session = Depends(get_db)):
         rule_techniques[lv.id] = own_technique_ids
         verified_techniques_by_rule_version[lv.id] = _verified_techniques_for_rule_version(db, lv.id)
 
-    return build_coverage_report(rule_techniques, verified_techniques_by_rule_version)
+    report = build_coverage_report(rule_techniques, verified_techniques_by_rule_version)
+    wazuh_validated = {
+        row[0]
+        for row in db.query(ValidationRun.technique_id)
+        .filter(
+            ValidationRun.expected_detection == "DETECT",
+            ValidationRun.observed_detection == "DETECT",
+            ValidationRun.final_classification == "PASS",
+        )
+        .distinct()
+        .all()
+        if row[0]
+    }
+    telemetry_available = {
+        row[0] for row in db.query(ValidationRun.technique_id)
+        .filter(ValidationRun.telemetry_artifact_id.isnot(None)).distinct().all() if row[0]
+    }
+    for row in report:
+        row["declared"] = row["has_rule"]
+        row["telemetry_available"] = row["technique_id"] in telemetry_available
+        row["twin_validated"] = row["rule_passes"]
+        row["wazuh_validated"] = row["technique_id"] in wazuh_validated
+    return report
 
 
 @app.get("/coverage/navigator-layer")

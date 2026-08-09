@@ -352,11 +352,14 @@ export default function EnvironmentPage() {
                     </div>
                     <Badge tone={statusTone[run.status] || "neutral"}>{run.status}</Badge>
                   </div>
-                  <div className="mt-3 grid gap-2 text-sm text-slate-400">
-                    <div>Expected: {run.expected_detection || "unknown"}</div>
-                    <div>Observed: {run.observed_detection || "unknown"}</div>
-                    {run.matched_rule_id ? <div>Matched rule: {run.matched_rule_id}</div> : null}
-                  </div>
+                    <div className="mt-3 grid gap-2 text-sm text-slate-400">
+                      <div>Expected: {run.expected_detection || "unknown"}</div>
+                      <div>Twin: {run.twin_observed_detection || "not evaluated"}</div>
+                      <div>Observed: {run.observed_detection || "unknown"}</div>
+                      <div>Final: <span className="font-medium text-slate-200">{run.final_classification || run.status}</span></div>
+                      {run.matched_rule_id ? <div>Matched rule: {run.matched_rule_id}</div> : null}
+                      {run.telemetry_hash ? <div className="break-all font-mono text-[11px]">Telemetry hash: {run.telemetry_hash}</div> : null}
+                    </div>
                 </div>
               ))}
             </div>

@@ -117,6 +117,7 @@ class ValidationRun(Base):
     twin_observed_detection = Column(String(32), nullable=True)
     twin_evidence_json = Column("twin_evidence", JSON, default=dict)
     status = Column(String(32), default="PREDICTED")
+    final_classification = Column(String(32), nullable=True)
     started_at = Column(DateTime, default=_now)
     completed_at = Column(DateTime, nullable=True)
     evidence_json = Column("evidence", JSON, default=dict)
@@ -390,6 +391,8 @@ def init_db(engine):
             connection.execute(text("ALTER TABLE validation_runs ADD COLUMN twin_observed_detection VARCHAR(32)"))
         if "twin_evidence" not in validation_columns:
             connection.execute(text("ALTER TABLE validation_runs ADD COLUMN twin_evidence JSON"))
+        if "final_classification" not in validation_columns:
+            connection.execute(text("ALTER TABLE validation_runs ADD COLUMN final_classification VARCHAR(32)"))
         if "telemetry_artifact_id" not in generated_log_columns:
             connection.execute(text("ALTER TABLE generated_logs ADD COLUMN telemetry_artifact_id VARCHAR"))
         if "fingerprint" not in wazuh_rule_columns:

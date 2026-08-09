@@ -86,12 +86,19 @@ def test_protected_endpoint_rejects_expired_token(monkeypatch):
     assert response.status_code == 401
 
 
-def test_authenticated_analyst_can_access_detection_workflows(monkeypatch):
-    _create_user()
+def test_authenticated_admin_can_change_detection_configuration(monkeypatch):
+    _create_user(role="admin")
     client, csrf_token = _authenticated_client(monkeypatch)
     assert client.get("/environments").status_code == 200
     response = client.post("/environments", json={"name": "SOC Lab"}, headers={"X-CSRF-Token": csrf_token})
     assert response.status_code == 200
+
+
+def test_analyst_cannot_change_detection_configuration(monkeypatch):
+    _create_user()
+    client, csrf_token = _authenticated_client(monkeypatch)
+    response = client.post("/environments", json={"name": "SOC Lab"}, headers={"X-CSRF-Token": csrf_token})
+    assert response.status_code == 403
 
 
 def test_authenticated_cookie_write_requires_csrf_token(monkeypatch):

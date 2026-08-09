@@ -12,7 +12,7 @@ configuration and coverage drift.
 |---|---|
 | Import detection rules | Done — Sigma rules, versioned, soft-deletable |
 | Import MITRE ATT&CK mappings | Done — real STIX data via `mitreattack-python` |
-| Import telemetry / log schemas | Partial — synthetic + Atomic Red Team telemetry generation is done; ingestion of real raw Sysmon/auditd log text is written (`app/telemetry/parsers/`) but not yet wired to an endpoint |
+| Import telemetry / log schemas | Partial — synthetic + Atomic Red Team telemetry generation plus bounded Sysmon/auditd ingestion (`POST /telemetry/ingest`) are available |
 | Run attack simulations safely, outside production | Done |
 | Measure ATT&CK coverage, find blind spots | Done — `/coverage` |
 | Continuously compare production detections against the twin, detect drift | Done — `/drift/production` + `/drift/production/history`, against a real Wazuh lab |
@@ -76,9 +76,10 @@ hardcoded technique list.
 ### Wazuh integration
 `app/wazuh/client.py` — a failure-tolerant client for the Wazuh manager REST API (JWT auth,
 token refresh, never raises). Currently used for `GET /rules` (active technique coverage).
-Wazuh's `PUT /logtest` endpoint (feed a raw log line, get back Wazuh's real rule verdict +
-MITRE mapping) is confirmed reachable and documented but not yet wired in — natural next
-step for true event-level behavioral drift, not just rule-configuration drift.
+`POST /validation-runs` sends either manual telemetry or a stored telemetry artifact to Wazuh
+`/logtest`, persists Wazuh evidence alongside optional twin-rule evidence, and classifies
+unavailable Wazuh results as inconclusive. `GET /drift/configuration` compares the two latest
+Wazuh inventories for added, removed, status-changed, and content-changed rules.
 
 ## Setup
 
@@ -93,8 +94,7 @@ venv\Scripts\activate
 pip install -r requirements.txt
 pip install mitreattack-python
 ```
-> `mitreattack-python` is a hard dependency of `app/mitre/attack_data_loader.py` but is
-> not yet listed in `requirements.txt` — add it manually until that's fixed.
+`mitreattack-python` is included in `requirements.txt`.
 
 Vendor the external rule/technique corpora (one-time, pulls from GitHub):
 ```powershell
@@ -107,6 +107,9 @@ Create `backend\.env` (gitignored):
 WAZUH_BASE_URL=https://<your-wazuh-manager-ip>:55000
 WAZUH_USERNAME=wazuh
 WAZUH_PASSWORD=<your-password>
+WAZUH_CA_BUNDLE=<optional-path-to-private-ca.pem>
+# Leave false except for an isolated development lab with a self-signed certificate.
+WAZUH_INSECURE_SKIP_TLS_VERIFY=false
 
 An LLM API key (`GROQ_API_KEY` / `GEMINI_API_KEY` / `OPENAI_API_KEY`) is optional — without
 one, AI-suggested technique mappings degrade to a no-op stub rather than failing.
@@ -137,7 +140,7 @@ npm run dev
 cd backend
 python -m pytest
 ```
-71 tests total, all passing once the vendored corpora and `mitreattack-python` are present.
+Run `pytest -q` to report the current suite count after local verification.
 
 ## Detection quality notes
 

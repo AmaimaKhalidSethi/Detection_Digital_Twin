@@ -11,6 +11,7 @@ export default function DriftPage() {
   const [productionLoading, setProductionLoading] = useState(true);
   const [productionError, setProductionError] = useState("");
   const [history, setHistory] = useState([]);
+  const [configurationDrift, setConfigurationDrift] = useState(null);
 
   useEffect(() => {
     api.drift().then((d) => {
@@ -25,6 +26,7 @@ export default function DriftPage() {
     try {
       setProductionDrift(await api.productionDrift());
       setHistory(await api.productionDriftHistory());
+      setConfigurationDrift(await api.configurationDrift());
     } catch (error) {
       setProductionError(error.message);
     } finally {
@@ -59,6 +61,23 @@ export default function DriftPage() {
                   </div>
                 </div>
                 <Badge tone="amber">changed</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel title="Configuration drift" eyebrow="Wazuh inventory snapshots">
+        {!configurationDrift || configurationDrift.status === "insufficient_history" ? (
+          <EmptyState title="Need two Wazuh sync snapshots" hint="Run Environment sync twice to compare rule configuration." />
+        ) : configurationDrift.changes.length === 0 ? (
+          <EmptyState title="No configuration drift detected" />
+        ) : (
+          <ul className="divide-y divide-bg-800">
+            {configurationDrift.changes.map((change) => (
+              <li key={`${change.rule_id}-${change.category}`} className="flex items-center justify-between gap-3 py-3">
+                <span className="font-mono text-sm text-slate-300">Rule {change.rule_id}</span>
+                <Badge tone="amber">{change.category}</Badge>
               </li>
             ))}
           </ul>

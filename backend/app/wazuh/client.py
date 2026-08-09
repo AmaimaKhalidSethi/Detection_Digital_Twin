@@ -24,6 +24,10 @@ class WazuhClient:
         self.base_url = os.getenv("WAZUH_BASE_URL")
         self.username = os.getenv("WAZUH_USERNAME")
         self.password = os.getenv("WAZUH_PASSWORD")
+        insecure = os.getenv("WAZUH_INSECURE_SKIP_TLS_VERIFY", "false").strip().lower() in {"1", "true", "yes"}
+        self.verify_tls: bool | str = False if insecure else (os.getenv("WAZUH_CA_BUNDLE") or True)
+        if insecure:
+            logger.warning("Wazuh TLS certificate verification is disabled by explicit lab-only configuration.")
         self._token: str | None = None
         self._token_expires_at: float | None = None
 
@@ -39,7 +43,7 @@ class WazuhClient:
             response = requests.post(
                 url,
                 auth=(self.username, self.password),
-                verify=False,
+                verify=self.verify_tls,
                 timeout=10,
             )
             
@@ -48,7 +52,7 @@ class WazuhClient:
                 response = requests.post(
                     url,
                     json={"username": self.username, "password": self.password},
-                    verify=False,
+                    verify=self.verify_tls,
                     timeout=10,
                 )
 
@@ -75,7 +79,7 @@ class WazuhClient:
             response = requests.get(
                 f"{self.base_url.rstrip('/')}/manager/info",
                 headers={"Authorization": f"Bearer {token}"},
-                verify=False,
+                verify=self.verify_tls,
                 timeout=10,
             )
             response.raise_for_status()
@@ -118,7 +122,7 @@ class WazuhClient:
                     url,
                     headers={"Authorization": f"Bearer {token}"},
                     json=payload,
-                    verify=False,
+                    verify=self.verify_tls,
                     timeout=10,
                 )
                 if response.status_code == 401:
@@ -164,7 +168,7 @@ class WazuhClient:
                     f"{self.base_url.rstrip('/')}/{path.lstrip('/')}",
                     headers={"Authorization": f"Bearer {token}"},
                     params=params,
-                    verify=False,
+                    verify=self.verify_tls,
                     timeout=10,
                 )
                 response.raise_for_status()
@@ -230,7 +234,7 @@ class WazuhClient:
                     f"{self.base_url.rstrip('/')}/rules",
                     headers={"Authorization": f"Bearer {token}"},
                     params={"status": "enabled", "limit": limit, "offset": offset},
-                    verify=False,
+                    verify=self.verify_tls,
                     timeout=10,
                 )
                 response.raise_for_status()
