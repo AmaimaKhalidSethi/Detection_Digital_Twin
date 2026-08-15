@@ -83,6 +83,7 @@ export const api = {
     request("/evaluate", { method: "POST", body: JSON.stringify({ simulation_run_id: simulationRunId }) }),
 
   listAlerts: () => request("/alerts"),
+  deleteAlert: (alertId) => request(`/alerts/${alertId}`, { method: "DELETE" }),
   explainAlert: (alertId) => request(`/alerts/${alertId}/explain`),
   coverage: () => request("/coverage"),
   navigatorLayer: () => request("/coverage/navigator-layer"),

@@ -1414,6 +1414,14 @@ def list_alerts(db: Session = Depends(get_db)):
         )
     return out
 
+@app.delete("/alerts/{alert_id}")
+def delete_alert(alert_id: str, db: Session = Depends(get_db)):
+    result = db.get(DetectionResult, alert_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    db.delete(result)
+    db.commit()
+    return {"deleted": True, "alert_id": alert_id}
 
 @app.get("/alerts/{alert_id}/explain")
 def explain_alert(alert_id: str, db: Session = Depends(get_db)):

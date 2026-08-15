@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Sparkles } from "lucide-react";
+import { AlertTriangle, Sparkles, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { Panel, Badge, Button, EmptyState } from "../components/ui";
 
@@ -18,6 +18,12 @@ export default function AlertsPage() {
   const handleExplain = async (alertId) => {
     const explanation = await api.explainAlert(alertId);
     setExplanations((current) => ({ ...current, [alertId]: explanation }));
+  };
+
+  const handleDelete = async (alertId) => {
+    if (!window.confirm("Delete this alert? This cannot be undone.")) return;
+    await api.deleteAlert(alertId);
+    setAlerts((current) => current.filter((a) => a.alert_id !== alertId));
   };
 
   return (
@@ -43,7 +49,16 @@ export default function AlertsPage() {
                     </div>
                   </div>
                 </div>
-                {a.technique_id && <Badge tone="alert">{a.technique_id}</Badge>}
+                <div className="flex items-center gap-2">
+                  {a.technique_id && <Badge tone="alert">{a.technique_id}</Badge>}
+                  <button
+                    onClick={() => handleDelete(a.alert_id)}
+                    className="rounded-md p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
+                    title="Delete alert"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <Button variant="secondary" className="inline-flex items-center gap-2" onClick={() => handleExplain(a.alert_id)}>
