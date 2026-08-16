@@ -49,9 +49,10 @@ def build_drift_report(
     history: list[dict],
 ) -> list[dict]:
     """
-    Detect rule drift by comparing consecutive evaluations of the
-    same rule against the same technique.
+    Detect drift between consecutive evaluations of the same
+    rule version against the same technique.
     """
+
     by_rule_and_technique: dict[tuple[str, str], list[dict]] = {}
 
     for row in history:
@@ -61,14 +62,19 @@ def build_drift_report(
     drifted = []
 
     for (rule_id, technique_id), rows in by_rule_and_technique.items():
-        rows_sorted = sorted(rows, key=lambda r: r["evaluated_at"])
+        rows_sorted = sorted(
+            rows,
+            key=lambda r: r["evaluated_at"],
+        )
 
-        if len(rows_sorted) < 2:
-            continue
+        for previous, current in zip(rows_sorted, rows_sorted[1:]):
+            if previous["matched"] == current["matched"]:
+                continue
 
-        previous, current = rows_sorted[-2], rows_sorted[-1]
+            # Only report an actual rule-version change.
+            if previous["rule_version_id"] == current["rule_version_id"]:
+                continue
 
-        if previous["matched"] != current["matched"]:
             drifted.append(
                 {
                     "rule_id": rule_id,
@@ -85,3 +91,4 @@ def build_drift_report(
             )
 
     return drifted
+
