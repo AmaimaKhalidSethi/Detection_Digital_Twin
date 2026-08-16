@@ -1587,6 +1587,31 @@ def production_drift(db: Session = Depends(get_db)):
         "production_only": production_only,
     }
 
+@app.get("/drift/production/export")
+def export_production_drift(db: Session = Depends(get_db)):
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    data = production_drift(db)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Category", "Technique ID"])
+
+    for tid in data.get("covered_both", []):
+        writer.writerow(["Covered by both", tid])
+    for tid in data.get("twin_only", []):
+        writer.writerow(["Blind spot (twin only)", tid])
+    for tid in data.get("production_only", []):
+        writer.writerow(["Not yet verified (production only)", tid])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=drift_report.csv"},
+    )
 
 @app.get("/reports/summary")
 def report_summary(db: Session = Depends(get_db)):
@@ -1697,8 +1722,10 @@ def drift(db: Session = Depends(get_db)):
     history = []
     for r in results:
         run = db.get(SimulationRun, r.simulation_run_id)
+        rv = db.get(RuleVersion, r.rule_version_id)
         history.append(
             {
+                "rule_id": rv.rule_id if rv else None,
                 "rule_version_id": r.rule_version_id,
                 "technique_id": run.technique_id if run else "unknown",
                 "matched": r.matched,
@@ -1711,7 +1738,6 @@ def drift(db: Session = Depends(get_db)):
         rv = db.get(RuleVersion, d["rule_version_id"])
         out.append({**d, "rule_title": rv.rule.title if rv else "(deleted rule)"})
     return out
-
 
 @app.get("/health")
 def health():

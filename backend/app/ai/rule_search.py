@@ -40,12 +40,12 @@ def rebuild_rule_search_index(db: Session) -> None:
     """Populate the search table from the current rules."""
     ensure_rule_search_fts(db)
     db.execute(text("DELETE FROM rule_search"))
-    rows = (
-        db.query(DetectionRule.id, RuleVersion.id.label("version_id"), RuleVersion.yaml_content)
-        .join(RuleVersion, RuleVersion.rule_id == DetectionRule.id)
-        .all()
-    )
-    for rule_id, _version_id, yaml_content in rows:
+    rules = db.query(DetectionRule).all()
+    for rule in rules:
+        latest = rule.latest_version
+        if latest is None:
+            continue
+        yaml_content = latest.yaml_content
         title = _extract_yaml_scalar(yaml_content, "title") or ""
         description = _extract_yaml_scalar(yaml_content, "description") or ""
         tags = _extract_yaml_tags(yaml_content)
@@ -55,7 +55,7 @@ def rebuild_rule_search_index(db: Session) -> None:
                 "INSERT INTO rule_search (rule_id, title, description, tags, platform) "
                 "VALUES (:rule_id, :title, :description, :tags, :platform)"
             ),
-            {"rule_id": rule_id, "title": title, "description": description, "tags": tags, "platform": platform},
+            {"rule_id": rule.id, "title": title, "description": description, "tags": tags, "platform": platform},
         )
     db.commit()
 

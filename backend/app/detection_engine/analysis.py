@@ -62,11 +62,11 @@ def build_drift_report(
     """
     by_rule_and_technique: dict[tuple[str, str], list[dict]] = {}
     for row in history:
-        key = (row["rule_version_id"], row["technique_id"])
+        key = (row["rule_id"], row["technique_id"])
         by_rule_and_technique.setdefault(key, []).append(row)
 
     drifted = []
-    for (rule_version_id, technique_id), rows in by_rule_and_technique.items():
+    for (rule_id, technique_id), rows in by_rule_and_technique.items():
         rows_sorted = sorted(rows, key=lambda r: r["evaluated_at"])
         if len(rows_sorted) < 2:
             continue
@@ -74,7 +74,7 @@ def build_drift_report(
         if previous["matched"] != current["matched"]:
             drifted.append(
                 {
-                    "rule_version_id": rule_version_id,
+                    "rule_version_id": current["rule_version_id"],
                     "technique_id": technique_id,
                     "previous_result": previous["matched"],
                     "current_result": current["matched"],
