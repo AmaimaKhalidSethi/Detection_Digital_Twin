@@ -1719,25 +1719,58 @@ def production_drift_history(db: Session = Depends(get_db), limit: int = 30):
 @app.get("/drift")
 def drift(db: Session = Depends(get_db)):
     results = db.query(DetectionResult).order_by(DetectionResult.evaluated_at.asc()).all()
+
     history = []
     for r in results:
         run = db.get(SimulationRun, r.simulation_run_id)
         rv = db.get(RuleVersion, r.rule_version_id)
+
         history.append(
             {
                 "rule_id": rv.rule_id if rv else None,
                 "rule_version_id": r.rule_version_id,
+                "detection_result_id": r.id,
                 "technique_id": run.technique_id if run else "unknown",
                 "matched": r.matched,
                 "evaluated_at": r.evaluated_at.isoformat(),
+                "rule_content": rv.yaml_content if rv else None,
             }
         )
+
     drifted = build_drift_report(history)
+
     out = []
     for d in drifted:
         rv = db.get(RuleVersion, d["rule_version_id"])
-        out.append({**d, "rule_title": rv.rule.title if rv else "(deleted rule)"})
+
+        out.append(
+            {
+                **d,
+                "rule_title": rv.rule.title if rv else "(deleted rule)",
+            }
+        )
+
     return out
+
+
+@app.delete("/drift/{detection_result_id}")
+def delete_drift(
+    detection_result_id: str,
+    db: Session = Depends(get_db),
+):
+    result = db.get(DetectionResult, detection_result_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Drift result not found")
+
+    db.delete(result)
+    db.commit()
+
+    return {
+        "deleted": True,
+        "detection_result_id": detection_result_id,
+    }
+
 
 @app.get("/health")
 def health():
