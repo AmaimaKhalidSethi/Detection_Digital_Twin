@@ -997,7 +997,6 @@ def list_validation_runs(environment_id: str | None = None, db: Session = Depend
         for run in runs
     ]
 
-
 @app.get("/detection-gaps")
 def list_detection_gaps(environment_id: str | None = None, db: Session = Depends(get_db)):
     query = db.query(DetectionGap)
@@ -1729,7 +1728,7 @@ def drift(db: Session = Depends(get_db)):
     results = (
         db.query(DetectionResult)
         .join(RuleVersion, DetectionResult.rule_version_id == RuleVersion.id)
-        .order_by(DetectionResult.evaluated_at.asc())
+        .order_by(DetectionResult.evaluated_at.desc())
         .all()
     )
 
@@ -1764,8 +1763,48 @@ def drift(db: Session = Depends(get_db)):
         out.append(
             {
                 **d,
-                "rule_title": rv.rule.title if rv and rv.rule else "(deleted rule)",
+                "rule_title": (
+                    rv.rule.title
+                    if rv and rv.rule
+                    else "(deleted rule)"
+                ),
             }
         )
 
+    # NEWEST DRIFT FIRST
+    out.sort(
+        key=lambda d: (
+            d.get("detected_at")
+            or d.get("evaluated_at")
+            or ""
+        ),
+        reverse=True,
+    )
+
     return out
+
+
+@app.delete("/drift/{detection_result_id}")
+def delete_drift(
+    detection_result_id: int,
+    db: Session = Depends(get_db),
+):
+    result = (
+        db.query(DetectionResult)
+        .filter(DetectionResult.id == detection_result_id)
+        .first()
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Drift result not found",
+        )
+
+    db.delete(result)
+    db.commit()
+
+    return {
+        "success": True,
+        "deleted_detection_result_id": detection_result_id,
+    }
