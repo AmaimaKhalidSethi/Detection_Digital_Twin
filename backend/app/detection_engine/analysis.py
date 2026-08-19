@@ -49,46 +49,96 @@ def build_drift_report(
     history: list[dict],
 ) -> list[dict]:
     """
-    Detect drift between consecutive evaluations of the same
-    rule version against the same technique.
+    Detect drift between consecutive evaluations of the same rule
+    against the same technique.
+
+    Detects both directions:
+      True  -> False = Was firing -> Now not firing
+      False -> True  = Was not firing -> Now firing
     """
 
     by_rule_and_technique: dict[tuple[str, str], list[dict]] = {}
 
+    # Group evaluations by rule + technique
     for row in history:
-        key = (row["rule_id"], row["technique_id"])
+        rule_id = row.get("rule_id")
+        technique_id = row.get("technique_id")
+
+        if not rule_id or not technique_id:
+            continue
+
+        key = (rule_id, technique_id)
         by_rule_and_technique.setdefault(key, []).append(row)
 
     drifted = []
 
     for (rule_id, technique_id), rows in by_rule_and_technique.items():
+
+        # Oldest -> newest
         rows_sorted = sorted(
             rows,
-            key=lambda r: r["evaluated_at"],
+            key=lambda r: r.get("evaluated_at", ""),
         )
 
         for previous, current in zip(rows_sorted, rows_sorted[1:]):
-            if previous["matched"] == current["matched"]:
+
+            previous_matched = bool(previous.get("matched"))
+            current_matched = bool(current.get("matched"))
+
+            # No change in firing state = no drift
+            if previous_matched == current_matched:
                 continue
 
-            # Only report an actual rule-version change.
-            if previous["rule_version_id"] == current["rule_version_id"]:
+            # Drift must represent a different rule version
+            if previous.get("rule_version_id") == current.get("rule_version_id"):
+                continue
+
+            # Explicitly identify the direction
+            if previous_matched and not current_matched:
+                direction = "Was firing → Now not firing"
+            elif not previous_matched and current_matched:
+                direction = "Was not firing → Now firing"
+            else:
                 continue
 
             drifted.append(
                 {
                     "rule_id": rule_id,
-                    "rule_version_id": current["rule_version_id"],
-                    "previous_rule_version_id": previous["rule_version_id"],
-                    "detection_result_id": current["detection_result_id"],
+
+                    # Current version is the version that caused the drift
+                    "rule_version_id": current.get("rule_version_id"),
+
+                    "previous_rule_version_id": previous.get(
+                        "rule_version_id"
+                    ),
+
+                    "detection_result_id": current.get(
+                        "detection_result_id"
+                    ),
+
                     "technique_id": technique_id,
-                    "previous_result": previous["matched"],
-                    "current_result": current["matched"],
-                    "detected_at": current["evaluated_at"],
-                    "previous_rule_content": previous.get("rule_content"),
-                    "current_rule_content": current.get("rule_content"),
+
+                    # Previous/current firing state
+                    "previous_result": previous_matched,
+                    "current_result": current_matched,
+
+                    # Human-readable direction
+                    "direction": direction,
+
+                    # Timestamp of the new evaluation
+                    "detected_at": current.get("evaluated_at"),
+
+                    # Keep both versions of the rule for comparison
+                    "previous_rule_content": previous.get(
+                        "rule_content"
+                    ),
+
+                    "current_rule_content": current.get(
+                        "rule_content"
+                    ),
                 }
             )
 
     return drifted
+
 
