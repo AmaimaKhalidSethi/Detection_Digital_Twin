@@ -85,14 +85,26 @@ export const api = {
   listAlerts: () => request("/alerts"),
 deleteAlert: (alertId) => request(`/alerts/${alertId}`, { method: "DELETE" }),
 explainAlert: (alertId) => request(`/alerts/${alertId}/explain`),
+
 coverage: () => request("/coverage"),
 navigatorLayer: () => request("/coverage/navigator-layer"),
+
 drift: () => request("/drift"),
+
 deleteDrift: (detectionResultId) =>
-  request(`/drift/${detectionResultId}`, { method: "DELETE" }),
+  request(`/drift/${detectionResultId}`, {
+    method: "DELETE",
+  }),
+
 productionDrift: () => request("/drift/production"),
 productionDriftHistory: () => request("/drift/production/history"),
-configurationDrift: (environmentId) => request(`/drift/configuration${environmentId ? `?environment_id=${environmentId}` : ""}`),
+
+configurationDrift: (environmentId) =>
+  request(
+    `/drift/configuration${
+      environmentId ? `?environment_id=${environmentId}` : ""
+    }`
+  ),
 
   listEnvironments: () => request("/environments"),
   createEnvironment: (body) => request("/environments", { method: "POST", body: JSON.stringify(body) }),
