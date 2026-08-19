@@ -91,10 +91,12 @@ navigatorLayer: () => request("/coverage/navigator-layer"),
 
 drift: () => request("/drift"),
 
-deleteDrift: (detectionResultId) =>
-  request(`/drift/${detectionResultId}`, {
-    method: "DELETE",
-  }),
+  updateDriftStatus: (detectionResultId, status) =>
+    request(`/drift/${detectionResultId}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    }),
+  cancelJob: (jobId) => request(`/jobs/${jobId}/cancel`, { method: "POST" }),
 
 productionDrift: () => request("/drift/production"),
 productionDriftHistory: () => request("/drift/production/history"),

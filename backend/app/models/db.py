@@ -133,6 +133,7 @@ class TelemetryArtifact(Base):
     __tablename__ = "telemetry_artifacts"
 
     id = Column(String, primary_key=True, default=_uuid)
+    environment_id = Column(String, ForeignKey("environments.id"), nullable=True)
     source_type = Column(String(32), nullable=False)
     schema_version = Column(String(64), nullable=True)
     raw_telemetry = Column(Text, nullable=True)
@@ -221,6 +222,8 @@ class RuleTechniqueMap(Base):
     )
     confirmed = Column(Boolean, nullable=False, default=False)
     confidence = Column(Float, nullable=True)
+    evidence_quality = Column(String(32), nullable=True)
+    generator_source = Column(String(32), nullable=True)
     created_at = Column(DateTime, default=_now, nullable=False)
 
     rule_version = relationship("RuleVersion", back_populates="technique_mappings")
@@ -333,6 +336,7 @@ class DetectionResult(Base):
     simulation_run_id = Column(String, ForeignKey("simulation_runs.id"), nullable=False)
     matched = Column(Boolean, default=False)
     matched_event_id = Column(String, nullable=True)
+    status = Column(String(32), default="active")
     evaluated_at = Column(DateTime, default=_now)
 
 
@@ -397,3 +401,15 @@ def init_db(engine):
             connection.execute(text("ALTER TABLE generated_logs ADD COLUMN telemetry_artifact_id VARCHAR"))
         if "fingerprint" not in wazuh_rule_columns:
             connection.execute(text("ALTER TABLE wazuh_rules ADD COLUMN fingerprint VARCHAR(64)"))
+    artifact_columns = {column["name"] for column in inspect(engine).get_columns("telemetry_artifacts")}
+    rule_technique_columns = {column["name"] for column in inspect(engine).get_columns("rule_technique_map")}
+    detection_result_columns = {column["name"] for column in inspect(engine).get_columns("detection_results")}
+    with engine.begin() as connection:
+        if "environment_id" not in artifact_columns:
+            connection.execute(text("ALTER TABLE telemetry_artifacts ADD COLUMN environment_id VARCHAR"))
+        if "evidence_quality" not in rule_technique_columns:
+            connection.execute(text("ALTER TABLE rule_technique_map ADD COLUMN evidence_quality VARCHAR(32)"))
+        if "generator_source" not in rule_technique_columns:
+            connection.execute(text("ALTER TABLE rule_technique_map ADD COLUMN generator_source VARCHAR(32)"))
+        if "status" not in detection_result_columns:
+            connection.execute(text("ALTER TABLE detection_results ADD COLUMN status VARCHAR(32) DEFAULT 'active'"))

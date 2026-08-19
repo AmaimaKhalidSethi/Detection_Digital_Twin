@@ -104,9 +104,9 @@ def _first_usable_test(technique_id: str, document: dict) -> AtomicTest | None:
 
 
 @lru_cache(maxsize=1)
-def load_atomic_tests() -> dict[str, AtomicTest]:
-    """Return the first safe process-creation Atomic test for each technique."""
-    tests: dict[str, AtomicTest] = {}
+def load_all_atomic_tests() -> dict[str, list[AtomicTest]]:
+    """Return all safe process-creation Atomic tests for each technique."""
+    tests: dict[str, list[AtomicTest]] = {}
     if not VENDOR_ATOMICS.exists():
         LOG.warning("Atomic Red Team snapshot is not vendored at %s", VENDOR_ATOMICS)
         return tests
@@ -120,10 +120,41 @@ def load_atomic_tests() -> dict[str, AtomicTest]:
         if not isinstance(technique_id, str) or not technique_id.startswith("T"):
             LOG.warning("Skipping Atomic definition with invalid technique ID: %s", yaml_path)
             continue
-        selected = _first_usable_test(technique_id, document)
-        if selected:
-            tests[technique_id] = selected
+        
+        technique_tests = []
+        for test in document.get("atomic_tests") or []:
+            if not isinstance(test, dict):
+                continue
+            executor = test.get("executor") or {}
+            executor_name = executor.get("name")
+            if executor_name not in SUPPORTED_EXECUTORS:
+                continue
+            if _has_unresolvable_dependency(test):
+                continue
+            command = _resolve_command(test)
+            if command is None:
+                continue
+            guid = test.get("auto_generated_guid")
+            if not guid:
+                continue
+            technique_tests.append(AtomicTest(
+                technique_id=technique_id,
+                test_name=str(test.get("name") or "Unnamed Atomic test"),
+                test_guid=str(guid),
+                executor_name=str(executor_name),
+                resolved_command_line=command,
+                supported_platforms=tuple(test.get("supported_platforms") or ()),
+            ))
+        if technique_tests:
+            tests[technique_id] = technique_tests
     return tests
+
+
+@lru_cache(maxsize=1)
+def load_atomic_tests() -> dict[str, AtomicTest]:
+    """Return the first safe process-creation Atomic test for each technique."""
+    all_tests = load_all_atomic_tests()
+    return {tid: tests[0] for tid, tests in all_tests.items() if tests}
 
 
 @lru_cache(maxsize=1)

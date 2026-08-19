@@ -156,10 +156,12 @@ def run_simulation(technique_id: str, run_id: str) -> list[NormalizedEvent]:
     fn = TECHNIQUE_SIMULATIONS.get(technique_id)
     if fn is not None:
         return fn(run_id)
-    atomic_test = get_atomic_test(technique_id)
-    if atomic_test is None:
+    from app.telemetry.generators.atomic_red_team_loader import load_all_atomic_tests
+    all_tests = load_all_atomic_tests()
+    tests = all_tests.get(technique_id)
+    if not tests:
         raise ValueError(f"No simulation defined for technique {technique_id}")
-    return [build_atomic_telemetry(atomic_test, run_id)]
+    return [build_atomic_telemetry(test, run_id) for test in tests]
 
 
 def available_simulation_techniques() -> list[str]:

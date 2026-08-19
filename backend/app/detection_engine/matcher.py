@@ -211,3 +211,18 @@ class RuleMatcher:
         return [(e, self.match(e)) for e in events]
 
 
+def check_event_shape_compatibility(rule: SigmaRule, event: dict) -> bool:
+    """Ensure the event fields are compatible with the rule's logsource category."""
+    category = getattr(rule.logsource, "category", None)
+    if not category:
+        return True
+    category = str(category).strip().lower()
+    if category == "network_connection":
+        return "DestinationIp" in event or "DestinationPort" in event
+    elif category == "registry_event":
+        return "TargetObject" in event or "Details" in event
+    elif category == "process_creation":
+        return "Image" in event or "CommandLine" in event
+    return True
+
+

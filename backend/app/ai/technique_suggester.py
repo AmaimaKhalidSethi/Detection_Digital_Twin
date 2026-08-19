@@ -13,7 +13,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(os.path.dir
 from app.detection_engine.evaluator import evaluate_rule_version_against_events
 from app.models.db import RuleTechniqueMap, RuleVersion
 from app.telemetry.generators.synthetic_log_generator import run_simulation
-from app.technique_maps import upsert_rule_technique_map
+from app.technique_maps import upsert_rule_technique_map, verify_and_upsert_confirmed_mapping
 
 logger = logging.getLogger(__name__)
 
@@ -181,4 +181,9 @@ def confirm_ai_suggestions(rule_version: RuleVersion, db, technique_ids: list[st
         events = run_simulation(technique_id, f"ai-confirm:{rule_version.id}:{technique_id}")
         result = evaluate_rule_version_against_events(rule_version.id, rule_version.yaml_content, events)
         if result["matched"]:
-            upsert_rule_technique_map(db, rule_version.id, technique_id, "brute_force_confirmed", confirmed=True)
+            verify_and_upsert_confirmed_mapping(
+                db,
+                rule_version,
+                technique_id,
+                events[result["matched_event_index"]],
+            )

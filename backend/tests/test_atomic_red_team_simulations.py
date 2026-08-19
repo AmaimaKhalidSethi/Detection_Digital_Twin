@@ -30,8 +30,8 @@ def test_vendored_atomic_loader_supports_at_least_200_distinct_techniques():
     # Build every advertised Atomic simulation. This does not execute a command.
     for technique_id in atomic_tests:
         events = run_simulation(technique_id, "atomic-scale-test")
-        assert len(events) == 1
-        assert events[0].technique_id == technique_id
+        assert len(events) >= 1
+        assert all(ev.technique_id == technique_id for ev in events)
 
 
 def test_atomic_command_lines_match_reviewed_golden_file():

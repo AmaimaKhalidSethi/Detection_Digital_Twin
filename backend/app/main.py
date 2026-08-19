@@ -3,8 +3,12 @@ from __future__ import annotations
 import io
 import hashlib
 import json
+import logging
 import re
-from datetime import datetime, timezone
+import threading
+import time
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,11 +44,12 @@ from app.detection_engine.analysis import build_coverage_report, build_drift_rep
 from app.ai.rule_search import rebuild_rule_search_index, search_rules, _extract_yaml_scalar
 from app.ai.technique_suggester import confirm_ai_suggestions, suggest_rule_techniques
 from app.ai.alert_explainer import explain_match
-from app.technique_maps import upsert_rule_technique_map
+from app.technique_maps import upsert_rule_technique_map, verify_and_upsert_confirmed_mapping
 from app.telemetry.generators.synthetic_log_generator import (
     available_simulation_techniques,
     run_simulation,
     simulation_coverage_gaps,
+    generate_benign_baseline,
 )
 from app.mitre.attack_data_loader import all_techniques
 
@@ -52,7 +57,89 @@ engine = make_engine()
 SessionLocal = make_session_factory(engine)
 init_db(engine)
 
-app = FastAPI(title="Detection Digital Twin API", version="0.1.0")
+logger = logging.getLogger(__name__)
+
+# ---- scheduler observable state (Gap #5) ------------------------------------
+_scheduler_state: dict = {
+    "last_run": None,
+    "next_run": None,
+    "running": False,
+}
+_scheduler_lock = threading.Lock()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Modern lifespan handler — replaces deprecated on_event('startup')."""
+    start_background_scheduler()
+    yield
+
+
+app = FastAPI(title="Detection Digital Twin API", version="0.1.0", lifespan=lifespan)
+
+
+def start_background_scheduler():
+    import os
+
+    def run_scheduler():
+        logger.info("Background sync scheduler thread started.")
+        while True:
+            try:
+                # wait a bit on startup
+                time.sleep(10)
+                db = SessionLocal()
+                try:
+                    environment = db.query(Environment).order_by(Environment.created_at.asc()).first()
+                    if environment:
+                        interval = int(os.getenv("SYNC_INTERVAL_SECONDS", "3600"))
+                        now = datetime.now(timezone.utc)
+                        should_sync = False
+                        if not environment.last_sync_at:
+                            should_sync = True
+                        else:
+                            last_sync = environment.last_sync_at.replace(tzinfo=timezone.utc)
+                            elapsed = (now - last_sync).total_seconds()
+                            if elapsed >= interval:
+                                should_sync = True
+
+                        if should_sync:
+                            with _scheduler_lock:
+                                _scheduler_state["running"] = True
+                            logger.info("Starting scheduled background sync...")
+                            _perform_environment_sync(db, environment)
+                            _perform_production_drift(db)
+                            logger.info("Scheduled background sync complete.")
+                            with _scheduler_lock:
+                                _scheduler_state["last_run"] = datetime.now(timezone.utc).isoformat()
+                                _scheduler_state["running"] = False
+                except Exception as exc:
+                    logger.error("Error running background sync: %s", exc)
+                finally:
+                    db.close()
+            except Exception as loop_exc:
+                logger.error("Error in scheduler loop: %s", loop_exc)
+            interval_seconds = int(os.getenv("SYNC_INTERVAL_SECONDS", "3600"))
+            with _scheduler_lock:
+                _scheduler_state["next_run"] = (
+                    datetime.now(timezone.utc).isoformat()
+                    if _scheduler_state["last_run"] is None
+                    else (datetime.fromisoformat(_scheduler_state["last_run"])
+                          + timedelta(seconds=interval_seconds)).isoformat()
+                )
+            time.sleep(60)
+
+    thread = threading.Thread(target=run_scheduler, daemon=True)
+    thread.start()
+
+
+# Startup is now handled by the `lifespan` context manager above.
+
+
+@app.get("/scheduler/status")
+def scheduler_status():
+    """Gap #5: Observable scheduler state for support engineers."""
+    with _scheduler_lock:
+        return dict(_scheduler_state)
 
 def get_db():
     db = SessionLocal()
@@ -122,6 +209,10 @@ class SimulateRequest(BaseModel):
     technique_id: str
 
 
+class DriftStatusUpdateRequest(BaseModel):
+    status: str
+
+
 class EvaluateRequest(BaseModel):
     simulation_run_id: str
 
@@ -160,6 +251,7 @@ class TelemetryIngestRequest(BaseModel):
     raw_telemetry: str
     schema_version: str | None = None
     technique_id: str | None = None
+    environment_id: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -442,16 +534,21 @@ def _run_full_matrix_evaluation(job_id: str) -> None:
         db.commit()
 
         for rule_version in active_versions:
+            db.refresh(job)
+            if job.status == "failed" and job.result_summary and job.result_summary.get("status") == "cancelled":
+                logger.info("Job %s was cancelled. Exiting evaluation loop.", job_id)
+                return
             for technique_id in simulatable_techniques:
                 events = run_simulation(technique_id, f"{job_id}:{rule_version.id}:{technique_id}")
                 result = evaluate_rule_version_against_events(rule_version.id, rule_version.yaml_content, events)
                 if result["matched"]:
-                    upsert_rule_technique_map(
+                    matched_ev = events[result["matched_event_index"]]
+                    matched_ev_dict = matched_ev.to_dict() if hasattr(matched_ev, "to_dict") else (matched_ev if isinstance(matched_ev, dict) else vars(matched_ev))
+                    verify_and_upsert_confirmed_mapping(
                         db,
-                        rule_version.id,
+                        rule_version,
                         technique_id,
-                        "brute_force_confirmed",
-                        confirmed=True,
+                        matched_ev_dict,
                     )
                 job.progress_current += 1
             db.commit()
@@ -559,22 +656,18 @@ def list_endpoints(environment_id: str, db: Session = Depends(get_db)):
     ]
 
 
-@app.post("/environment/sync")
-def sync_environment(db: Session = Depends(get_db), admin: User | None = Depends(require_admin)):
-    environment = db.query(Environment).order_by(Environment.created_at.asc()).first()
-    if environment is None:
-        environment = Environment(name="Home Detection Lab", description="Default digital twin environment", status="active")
-        db.add(environment)
-        db.flush()
-
+def _perform_environment_sync(db: Session, environment: Environment) -> dict:
     client = WazuhClient()
     manager_info = client.get_manager_info()
     if manager_info is None:
-        raise HTTPException(status_code=503, detail="Wazuh manager unavailable")
+        raise ValueError("Wazuh manager unavailable")
 
     agents = client.get_agents()
     wazuh_rules = client.get_rules()
     active_techniques = client.get_active_technique_ids()
+
+    if agents is None or wazuh_rules is None or active_techniques is None:
+        raise ValueError("Incomplete inventory from Wazuh manager. Sync aborted to preserve snapshot.")
 
     environment.last_sync_at = datetime.now(timezone.utc)
 
@@ -600,15 +693,20 @@ def sync_environment(db: Session = Depends(get_db), admin: User | None = Depends
                 platform.version = str(version_value)
 
     synced_agent_ids: set[str] = set()
+    added_agents = 0
+    unchanged_agents = 0
+    stale_agents = 0
+
+    existing_endpoints = {
+        endpoint.agent_id: endpoint
+        for endpoint in db.query(Endpoint)
+        .filter(Endpoint.environment_id == environment.id)
+        .filter(Endpoint.agent_id.isnot(None))
+        .all()
+        if endpoint.agent_id
+    }
+
     if isinstance(agents, list):
-        existing_endpoints = {
-            endpoint.agent_id: endpoint
-            for endpoint in db.query(Endpoint)
-            .filter(Endpoint.environment_id == environment.id)
-            .filter(Endpoint.agent_id.isnot(None))
-            .all()
-            if endpoint.agent_id
-        }
         for agent in agents:
             if not isinstance(agent, dict):
                 continue
@@ -634,6 +732,7 @@ def sync_environment(db: Session = Depends(get_db), admin: User | None = Depends
                     metadata_json={"source": "sync", "wazuh_agent": True},
                 )
                 db.add(endpoint)
+                added_agents += 1
             else:
                 endpoint.hostname = hostname
                 endpoint.operating_system = operating_system or endpoint.operating_system
@@ -641,16 +740,31 @@ def sync_environment(db: Session = Depends(get_db), admin: User | None = Depends
                 endpoint.agent_version = agent_version or endpoint.agent_version
                 endpoint.last_seen = last_seen or endpoint.last_seen
                 endpoint.metadata_json = {**(endpoint.metadata_json or {}), "source": "sync", "wazuh_agent": True}
+                unchanged_agents += 1
             synced_agent_ids.add(agent_id)
 
+    # Reconcile stale agents
+    for agent_id, endpoint in existing_endpoints.items():
+        if agent_id not in synced_agent_ids:
+            if endpoint.agent_status != "stale":
+                endpoint.agent_status = "stale"
+                stale_agents += 1
+
     synced_rules = 0
+    added_count = 0
+    removed_count = 0
+    changed_count = 0
+    unchanged_count = 0
+
+    existing_wazuh_rules = {
+        rule.rule_id: rule
+        for rule in db.query(WazuhRule)
+        .filter(WazuhRule.environment_id == environment.id)
+        .all()
+    }
+
+    synced_rule_ids = set()
     if isinstance(wazuh_rules, list):
-        existing_wazuh_rules = {
-            rule.rule_id: rule
-            for rule in db.query(WazuhRule)
-            .filter(WazuhRule.environment_id == environment.id)
-            .all()
-        }
         for rule_data in wazuh_rules:
             if not isinstance(rule_data, dict):
                 continue
@@ -684,7 +798,13 @@ def sync_environment(db: Session = Depends(get_db), admin: User | None = Depends
                 )
                 db.add(wazuh_rule)
                 db.flush()
+                for technique_id in techniques:
+                    db.add(WazuhRuleTechnique(wazuh_rule=wazuh_rule, technique_id=technique_id))
+                db.flush()
+                wazuh_rule.fingerprint = _wazuh_rule_fingerprint(wazuh_rule)
+                added_count += 1
             else:
+                old_fp = wazuh_rule.fingerprint
                 wazuh_rule.description = description or wazuh_rule.description
                 wazuh_rule.level = level or wazuh_rule.level
                 wazuh_rule.status = status or wazuh_rule.status
@@ -694,18 +814,31 @@ def sync_environment(db: Session = Depends(get_db), admin: User | None = Depends
                 wazuh_rule.metadata_json = {**(wazuh_rule.metadata_json or {}), "source": "sync", "wazuh_rule": True}
                 wazuh_rule.last_synced_at = datetime.now(timezone.utc)
 
-            existing_technique_ids = {mapping.technique_id for mapping in wazuh_rule.technique_mappings}
-            for technique_id in techniques:
-                if technique_id not in existing_technique_ids:
-                    db.add(WazuhRuleTechnique(wazuh_rule=wazuh_rule, technique_id=technique_id))
-            for mapping in list(wazuh_rule.technique_mappings):
-                if mapping.technique_id not in techniques:
-                    db.delete(mapping)
+                existing_technique_ids = {mapping.technique_id for mapping in wazuh_rule.technique_mappings}
+                for technique_id in techniques:
+                    if technique_id not in existing_technique_ids:
+                        db.add(WazuhRuleTechnique(wazuh_rule=wazuh_rule, technique_id=technique_id))
+                for mapping in list(wazuh_rule.technique_mappings):
+                    if mapping.technique_id not in techniques:
+                        db.delete(mapping)
 
-            db.flush()
-            wazuh_rule.fingerprint = _wazuh_rule_fingerprint(wazuh_rule)
+                db.flush()
+                new_fp = _wazuh_rule_fingerprint(wazuh_rule)
+                wazuh_rule.fingerprint = new_fp
+                if old_fp != new_fp:
+                    changed_count += 1
+                else:
+                    unchanged_count += 1
 
+            synced_rule_ids.add(rule_id)
             synced_rules += 1
+
+    # Reconcile stale rules
+    for rule_id, rule in existing_wazuh_rules.items():
+        if rule_id not in synced_rule_ids:
+            if rule.status != "stale":
+                rule.status = "stale"
+                removed_count += 1
 
     db.flush()
 
@@ -729,6 +862,14 @@ def sync_environment(db: Session = Depends(get_db), admin: User | None = Depends
         "disabled_rule_count": disabled_rule_count,
         "technique_count": technique_count,
         "status": "ok",
+        "sync_stats": {
+            "rules_added": added_count,
+            "rules_removed": removed_count,
+            "rules_changed": changed_count,
+            "rules_unchanged": unchanged_count,
+            "agents_added": added_agents,
+            "agents_stale": stale_agents,
+        },
         "rule_inventory": {
             rule.rule_id: {"status": rule.status, "fingerprint": rule.fingerprint}
             for rule in persisted_wazuh_rules
@@ -744,9 +885,28 @@ def sync_environment(db: Session = Depends(get_db), admin: User | None = Depends
         "environment": environment.name,
         "agents_synced": synced_agent_count,
         "rules_synced": synced_rules,
-        "alerts_synced": 0,
+        "rules_added": added_count,
+        "rules_removed": removed_count,
+        "rules_changed": changed_count,
+        "rules_unchanged": unchanged_count,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.post("/environment/sync")
+def sync_environment(db: Session = Depends(get_db), admin: User | None = Depends(require_admin)):
+    environment = db.query(Environment).order_by(Environment.created_at.asc()).first()
+    if environment is None:
+        environment = Environment(name="Home Detection Lab", description="Default digital twin environment", status="active")
+        db.add(environment)
+        db.flush()
+
+    try:
+        return _perform_environment_sync(db, environment)
+    except ValueError as exc:
+        if str(exc) == "Wazuh manager unavailable":
+            raise HTTPException(status_code=503, detail=str(exc))
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @app.get("/drift/configuration")
@@ -794,22 +954,67 @@ def ingest_telemetry(payload: TelemetryIngestRequest, db: Session = Depends(get_
     """Persist bounded representative Sysmon/auditd telemetry for validation."""
     if len(payload.raw_telemetry.encode("utf-8")) > 200_000:
         raise HTTPException(status_code=422, detail="Telemetry exceeds 200000 byte limit")
+    
+    if payload.environment_id:
+        env = db.get(Environment, payload.environment_id)
+        if not env:
+            raise HTTPException(status_code=404, detail="Environment not found")
+
     source_type = payload.source_type.strip().lower()
+    
+    # Ingestion Diagnostics
+    accepted = 0
+    rejected = 0
+    warnings = []
+    artifacts = []
+    
+    if payload.technique_id and payload.technique_id not in all_techniques():
+        warnings.append(f"Technique ID {payload.technique_id} is not a valid MITRE ATT&CK technique")
+
     if source_type == "sysmon":
-        normalized_events = [parse_sysmon_text_block(payload.raw_telemetry)]
+        # Split by double newline to support multiple events
+        blocks = [b.strip() for b in re.split(r'\n\s*\n', payload.raw_telemetry) if b.strip()]
+        try:
+            normalized_events = parse_sysmon_batch(blocks)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Failed to parse Sysmon batch: {e}")
     elif source_type == "auditd":
-        normalized_events = parse_auditd_batch(payload.raw_telemetry.splitlines())
+        try:
+            normalized_events = parse_auditd_batch(payload.raw_telemetry.splitlines())
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Failed to parse auditd batch: {e}")
     else:
         raise HTTPException(status_code=422, detail="source_type must be sysmon or auditd")
-    if not normalized_events:
-        raise HTTPException(status_code=422, detail="Telemetry could not be normalized")
 
-    artifacts = []
     for event in normalized_events:
+        # Check if semantically empty
+        is_empty = (
+            not event.Image
+            and not event.CommandLine
+            and not event.TargetObject
+            and not event.Details
+            and not event.DestinationIp
+            and not event.DestinationPort
+            and not event.comm
+            and not event.exe
+        )
+        if is_empty:
+            rejected += 1
+            warnings.append("Rejected event because it is semantically empty (all known fields are missing)")
+            continue
+
+        # Check required fields
+        if source_type == "sysmon" and not event.Image and not event.CommandLine:
+            warnings.append("Sysmon event is missing both Image and CommandLine fields")
+        elif source_type == "auditd" and not event.exe and not event.comm:
+            warnings.append("Auditd event is missing both exe and comm fields")
+
         normalized_event = event.to_dict()
         if payload.technique_id:
             normalized_event["technique_id"] = payload.technique_id
+
         artifact = TelemetryArtifact(
+            environment_id=payload.environment_id,
             source_type=source_type,
             schema_version=payload.schema_version or f"{source_type}/v1",
             raw_telemetry=payload.raw_telemetry,
@@ -818,9 +1023,20 @@ def ingest_telemetry(payload: TelemetryIngestRequest, db: Session = Depends(get_
         )
         db.add(artifact)
         db.flush()
-        artifacts.append({"id": artifact.id, "content_hash": artifact.content_hash, "normalized_event": normalized_event})
+        accepted += 1
+        artifacts.append({
+            "id": artifact.id,
+            "content_hash": artifact.content_hash,
+            "normalized_event": normalized_event
+        })
+
     db.commit()
-    return {"artifacts": artifacts}
+    return {
+        "accepted": accepted,
+        "rejected": rejected,
+        "warnings": warnings,
+        "artifacts": artifacts
+    }
 
 
 @app.post("/validation-runs")
@@ -834,19 +1050,38 @@ def create_validation_run(payload: ValidationRunCreateRequest, db: Session = Dep
         endpoint = db.get(Endpoint, payload.endpoint_id)
         if endpoint is None:
             raise HTTPException(status_code=404, detail="Endpoint not found")
+        if endpoint.environment_id != payload.environment_id:
+            raise HTTPException(status_code=400, detail="Endpoint does not belong to the selected environment")
 
     artifact = db.get(TelemetryArtifact, payload.telemetry_artifact_id) if payload.telemetry_artifact_id else None
     if payload.telemetry_artifact_id and artifact is None:
         raise HTTPException(status_code=404, detail="Telemetry artifact not found")
+
+    if artifact:
+        if artifact.environment_id and artifact.environment_id != payload.environment_id:
+            raise HTTPException(status_code=400, detail="Telemetry artifact does not belong to the selected environment")
+        if artifact.simulation_run_id and payload.technique_id:
+            sim_run = db.get(SimulationRun, artifact.simulation_run_id)
+            if sim_run and sim_run.technique_id != payload.technique_id:
+                raise HTTPException(status_code=400, detail=f"Telemetry artifact is from simulation of a different technique ({sim_run.technique_id})")
+        if payload.simulation_id and artifact.simulation_run_id and artifact.simulation_run_id != payload.simulation_id:
+            raise HTTPException(status_code=400, detail="Telemetry artifact does not belong to the selected simulation")
+
     rule_version = db.get(RuleVersion, payload.rule_version_id) if payload.rule_version_id else None
     if payload.rule_version_id and rule_version is None:
         raise HTTPException(status_code=404, detail="Rule version not found")
+
+    if rule_version and payload.technique_id:
+        mapped_tids = {m.technique_id for m in rule_version.technique_mappings}
+        if payload.technique_id not in mapped_tids:
+            raise HTTPException(status_code=400, detail="Rule version is not mapped to the selected technique")
 
     manual_telemetry = payload.telemetry or ((payload.evidence or {}).get("telemetry") if payload.evidence else None) or ((payload.evidence or {}).get("log_input") if payload.evidence else None)
     if artifact is None:
         telemetry_input = manual_telemetry or ""
         normalized_event = {"raw_telemetry": telemetry_input}
         artifact = TelemetryArtifact(
+            environment_id=environment.id,
             source_type="manual",
             schema_version="manual-logtext/v1",
             raw_telemetry=telemetry_input,
@@ -930,16 +1165,23 @@ def create_validation_run(payload: ValidationRunCreateRequest, db: Session = Dep
     db.add(validation_run)
     db.flush()
 
-    if status in {"DETECTION_GAP", "FALSE_POSITIVE"}:
+    if final_classification in {"DETECTION_GAP", "FALSE_POSITIVE"}:
+        severity = "medium"
+        reason = f"Expected {expected_detection or 'unknown'} but observed twin={twin_observed_detection or 'unavailable'}, wazuh={observed_detection or 'unavailable'}"
+        recommendation = "Review rule coverage and telemetry availability for the targeted technique."
+        
+        if final_classification == "FALSE_POSITIVE":
+            severity = "high"
+            reason = f"False positive: expected benign (NO_DETECT) but detected by twin={twin_observed_detection} or wazuh={observed_detection}"
+            recommendation = "Analyze rule conditions to filter benign baseline activity."
+            
         gap = DetectionGap(
             environment_id=environment.id,
             technique_id=payload.technique_id,
             validation_run_id=validation_run.id,
-            severity="medium",
-            reason=(
-                f"Expected {expected_detection or 'unknown'} but observed twin={twin_observed_detection or 'unavailable'}, wazuh={observed_detection or 'unavailable'}"
-            ),
-            recommendation="Review rule coverage and telemetry availability for the targeted technique.",
+            severity=severity,
+            reason=reason,
+            recommendation=recommendation,
             status="open",
         )
         db.add(gap)
@@ -1255,6 +1497,10 @@ def list_simulations(db: Session = Depends(get_db)):
 
 @app.post("/jobs/full-matrix-evaluation")
 def create_full_matrix_job(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    existing_job = db.query(Job).filter(Job.job_type == "full_matrix_evaluation", Job.status.in_({"queued", "running"})).first()
+    if existing_job:
+        raise HTTPException(status_code=409, detail="A full matrix evaluation job is already running or queued.")
+
     job = Job(job_type="full_matrix_evaluation", status="queued", progress_current=0, progress_total=0)
     db.add(job)
     db.flush()
@@ -1278,6 +1524,20 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
         "created_at": job.created_at.isoformat(),
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
     }
+
+
+@app.post("/jobs/{job_id}/cancel")
+def cancel_job(job_id: str, db: Session = Depends(get_db)):
+    job = db.get(Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status not in {"queued", "running"}:
+        raise HTTPException(status_code=400, detail="Only queued or running jobs can be cancelled")
+    job.status = "failed"
+    job.result_summary = {"status": "cancelled", "reason": "Cancelled by user"}
+    job.finished_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"status": "cancelled", "job_id": job.id}
 
 
 @app.post("/rules/{rule_id}/suggest-techniques")
@@ -1327,6 +1587,16 @@ def test_rule(rule_id: str, db: Session = Depends(get_db)):
         results.append({"technique_id": technique_id, "matched": result["matched"]})
 
     unexpected_matches = [item["technique_id"] for item in results if item["matched"] and item["technique_id"] not in mapped_techniques]
+
+    # Run benign baseline false-positive test
+    benign_events = [ev.to_dict() for ev in generate_benign_baseline(f"rule-test-fp:{rule.id}", count=100)]
+    fp_matches = 0
+    for ev in benign_events:
+        res = evaluate_rule_version_against_events(rule_version.id, rule_version.yaml_content, [ev])
+        if res["matched"]:
+            fp_matches += 1
+    false_positive_rate = fp_matches / len(benign_events) if benign_events else 0.0
+
     return {
         "rule_version_id": rule_version.id,
         "rule_title": rule.title,
@@ -1334,6 +1604,7 @@ def test_rule(rule_id: str, db: Session = Depends(get_db)):
         "tested_techniques": [item["technique_id"] for item in results],
         "matched_techniques": [item["technique_id"] for item in results if item["matched"]],
         "unexpected_matches": unexpected_matches,
+        "false_positive_rate": false_positive_rate,
     }
 
 
@@ -1371,12 +1642,11 @@ def evaluate(payload: EvaluateRequest, db: Session = Depends(get_db)):
             alerts.append(dr)
             rule_version = db.get(RuleVersion, res["rule_version_id"])
             if rule_version is not None:
-                upsert_rule_technique_map(
+                verify_and_upsert_confirmed_mapping(
                     db,
-                    res["rule_version_id"],
+                    rule_version,
                     run.technique_id,
-                    "brute_force_confirmed",
-                    confirmed=True,
+                    events[res["matched_event_index"]],
                 )
     db.commit()
 
@@ -1422,14 +1692,20 @@ def delete_alert(alert_id: str, db: Session = Depends(get_db)):
     db.commit()
     return {"deleted": True, "alert_id": alert_id}
 
-@app.delete("/drift/{detection_result_id}")
-def delete_drift(detection_result_id: str, db: Session = Depends(get_db)):
+@app.put("/drift/{detection_result_id}/status")
+def update_drift_status(
+    detection_result_id: str,
+    payload: DriftStatusUpdateRequest,
+    db: Session = Depends(get_db),
+):
     result = db.get(DetectionResult, detection_result_id)
     if not result:
         raise HTTPException(status_code=404, detail="Drift record not found")
-    db.delete(result)
+    if payload.status not in {"active", "acknowledged", "suppressed", "resolved"}:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    result.status = payload.status
     db.commit()
-    return {"deleted": True, "detection_result_id": detection_result_id}
+    return {"status": result.status, "detection_result_id": detection_result_id}
 
 @app.get("/alerts/{alert_id}/explain")
 def explain_alert(alert_id: str, db: Session = Depends(get_db)):
@@ -1538,13 +1814,7 @@ def coverage_navigator_layer(db: Session = Depends(get_db)):
     }
 
 
-@app.get("/drift/production")
-def production_drift(db: Session = Depends(get_db)):
-    """
-    Compares the digital twin's verified technique coverage against the real
-    Wazuh production instance's actively enabled rules, to detect drift
-    between what the twin has confirmed and what production currently covers.
-    """
+def _perform_production_drift(db: Session) -> dict:
     twin_report = coverage(db)
     twin_verified = {row["technique_id"] for row in twin_report if row["rule_passes"]}
 
@@ -1595,13 +1865,32 @@ def production_drift(db: Session = Depends(get_db)):
         "production_only": production_only,
     }
 
+
+@app.get("/drift/production")
+def production_drift(db: Session = Depends(get_db)):
+    """
+    Compares the digital twin's verified technique coverage against the real
+    Wazuh production instance's actively enabled rules, to detect drift
+    between what the twin has confirmed and what production currently covers.
+    """
+    return _perform_production_drift(db)
+
+
 @app.get("/drift/production/export")
 def export_production_drift(db: Session = Depends(get_db)):
     import csv
     import io
     from fastapi.responses import StreamingResponse
 
-    data = production_drift(db)
+    latest = db.query(ProductionDriftSnapshot).order_by(ProductionDriftSnapshot.created_at.desc()).first()
+    if not latest:
+        data = _perform_production_drift(db)
+    else:
+        data = {
+            "covered_both": latest.covered_both or [],
+            "twin_only": latest.twin_only or [],
+            "production_only": latest.production_only or [],
+        }
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -1621,11 +1910,23 @@ def export_production_drift(db: Session = Depends(get_db)):
         headers={"Content-Disposition": "attachment; filename=drift_report.csv"},
     )
 
+
 @app.get("/reports/summary")
 def report_summary(db: Session = Depends(get_db)):
     """Generates a PDF summary of current coverage and production drift status."""
     coverage_data = coverage(db)
-    drift_data = production_drift(db)
+    latest = db.query(ProductionDriftSnapshot).order_by(ProductionDriftSnapshot.created_at.desc()).first()
+    if not latest:
+        drift_data = _perform_production_drift(db)
+    else:
+        drift_data = {
+            "wazuh_reachable": latest.wazuh_reachable,
+            "twin_verified_count": latest.twin_verified_count,
+            "production_active_count": latest.production_active_count,
+            "covered_both": latest.covered_both or [],
+            "twin_only": latest.twin_only or [],
+            "production_only": latest.production_only or [],
+        }
 
     technique_names = {row["technique_id"]: row["name"] for row in coverage_data}
     verified_count = sum(1 for row in coverage_data if row["rule_passes"])
@@ -1759,10 +2060,13 @@ def drift(db: Session = Depends(get_db)):
 
     for d in drifted:
         rv = db.get(RuleVersion, d["rule_version_id"])
+        res = db.get(DetectionResult, d["detection_result_id"])
+        status = res.status if res else "active"
 
         out.append(
             {
                 **d,
+                "status": status,
                 "rule_title": (
                     rv.rule.title
                     if rv and rv.rule
@@ -1784,27 +2088,4 @@ def drift(db: Session = Depends(get_db)):
     return out
 
 
-@app.delete("/drift/{detection_result_id}")
-def delete_drift(
-    detection_result_id: int,
-    db: Session = Depends(get_db),
-):
-    result = (
-        db.query(DetectionResult)
-        .filter(DetectionResult.id == detection_result_id)
-        .first()
-    )
-
-    if result is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Drift result not found",
-        )
-
-    db.delete(result)
-    db.commit()
-
-    return {
-        "success": True,
-        "deleted_detection_result_id": detection_result_id,
-    }
+# Drift lifecycle endpoints replace delete actions
