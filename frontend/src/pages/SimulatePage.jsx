@@ -55,11 +55,11 @@ export default function SimulatePage() {
       return "Rule did not match this event.";
     }
 
-    if (failure.type === "field_missing") {
+    if (failure.reason === "field_missing") {
       return `field '${failure.field}' was not present in this event`;
     }
 
-    if (failure.type === "value_mismatch") {
+    if (failure.reason === "value_mismatch") {
       return `field '${failure.field}' was '${failure.actual}', rule expected '${failure.expected}'`;
     }
 
