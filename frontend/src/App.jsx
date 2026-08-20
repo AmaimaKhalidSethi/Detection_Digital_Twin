@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FileCode2, PlayCircle, Bell, FlaskConical, Grid3x3, Radar, GitCommitHorizontal, LayoutDashboard, RefreshCw, LogOut, LoaderCircle } from "lucide-react";
 import { useAuth } from "./auth/AuthContext";
+import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RulesLibraryPage from "./pages/RulesLibraryPage";
 import RuleTestingPage from "./pages/RuleTestingPage";
@@ -45,6 +46,7 @@ const GROUPS = [
 export default function App() {
   const { user, status, logout } = useAuth();
   const [active, setActive] = useState("overview");
+  const [showLogin, setShowLogin] = useState(false);
 
   // Find the active component from all groups
   const activeTabObj = GROUPS.flatMap(g => g.tabs).find((t) => t.id === active);
@@ -58,8 +60,13 @@ export default function App() {
       </div>
     );
   }
-  
-  if (status !== "authenticated") return <LoginPage />;
+
+  if (status !== "authenticated") {
+    if (!showLogin) {
+      return <LandingPage onLogin={() => setShowLogin(true)} />;
+    }
+    return <LoginPage />;
+  }
 
   return (
     <div className="console-bg min-h-screen">
